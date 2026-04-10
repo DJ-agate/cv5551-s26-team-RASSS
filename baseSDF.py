@@ -12,17 +12,18 @@ mesh = trimesh.load(
 # Watertight: is closed surface
 # Trimesh only works for watertight objects
 # print("If watertight:", mesh.is_watertight)
-# print("Raw extents (inch):", mesh.extents)
-# print("Raw bounds (inch):", mesh.bounds)
+print("Raw extents (inch):", mesh.extents)
+print("Raw bounds (inch):", mesh.bounds)
 
 # Suppose the unit of STL is inch
 # Convert inch into meter
 mesh.apply_scale(0.0254)
 print("scaled extents (m):", mesh.extents)
 print("scaled bounds (m):", mesh.bounds)
+print("Bounds corners: ", trimesh.bounds.corners(mesh.bounds))
 # print("Edges: ", mesh.edges)
 # print("Facets: ", mesh.facets)
-# print("Centroid: ", mesh.centroid)
+print("Centroid: ", mesh.centroid)
 
 # Check the definition of signs (positive/negtive?)
 center = mesh.centroid.reshape(1, 3).astype(numpy.float32)
@@ -65,14 +66,14 @@ for k0 in range(0, nz, chunk):
     sdf_grid[:, :, k0:k1] = sdf_vals.reshape(nx, ny, k1 - k0)
 
 # Save npz file
-# numpy.savez(
-#     "mug_sdf.numpyz",
-#     sdf=sdf_grid,
-#     xs=xs,
-#     ys=ys,
-#     zs=zs,
-#     voxel_size=voxel_size
-# )
+numpy.savez(
+    "mug_sdf.numpyz",
+    sdf=sdf_grid,
+    xs=xs,
+    ys=ys,
+    zs=zs,
+    voxel_size=voxel_size
+)
 
 # print("Saved mug_sdf.numpyz")
 print("sdf min/max:", sdf_grid.min(), sdf_grid.max())
@@ -90,3 +91,47 @@ plt.colorbar()
 plt.title("SDF mid-z slice")
 plt.savefig("baseSDF.png", dpi=300, bbox_inches='tight')
 plt.show()
+
+
+# Get transformation (model frame -> cam frame)
+handle = mesh.centroid 
+handle[0] = handle[0] + 0.06  
+roll_vector = mesh.centroid - handle
+roll = roll_vector[0]
+yaw = numpy.array([0, 0, 1]) # just suppose 
+pitch = numpy.cross(roll, yaw)
+
+R = numpy.column_stack([roll, pitch, yaw])
+print("Rotation matrix: ", R)
+
+# Need t_mug_cam
+t_mug_model = numpy.eye(4)
+t_mug_model[:3, :3] = R
+t_mug_model[:3, 3] = mesh.centroid
+trans_init = t_mug_cam @ numpy.linalg.inv(t_mug_model)
+
+
+# point to point registration
+mug_point_cloud_model = mesh.sample_points_uniformly(numble_of_points=100000)
+source = o3d.io.read_point_cloud(mug_point_cloud_model)
+target = o3d.io.read_point_cloud(mug_point_cloud_cam)
+
+print("Initial alignment")
+threshold = 0.02
+evaluation = o3d.pipelines.registration.evaluate_registration(
+    source, target, threshold, trans_init)
+print(evaluation)
+
+reg_p2p = o3d.pipelines.registration.registration_icp(
+    source, target, threshold, trans_init,
+    o3d.pipelines.registration.TransformationEstimationPointToPoint())
+print(reg_p2p)
+print("Transformation is:")
+print(reg_p2p.transformation)
+
+
+# draw inital alignment
+draw_registration_result(source, target, reg_p2p.transformation)
+
+# Get the SDF value
+# trimesh.proximity.signed_distance(mesh, position)
