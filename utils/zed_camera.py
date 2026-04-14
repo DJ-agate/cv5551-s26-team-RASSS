@@ -11,7 +11,11 @@ class ZedCamera:
         init_params.enable_image_validity_check = True
         init_params.camera_resolution = resolution
         init_params.camera_fps = fps
+        init_params.depth_mode = sl.DEPTH_MODE.NEURAL_PLUS 
+        
         self._runtime_parameters = sl.RuntimeParameters()
+        #self._runtime_parameters.confidence_threshold = 80
+
 
         # Open ZED Camera
         err = self._zed.open(init_params)
@@ -56,7 +60,7 @@ class ZedCamera:
 
             if self._zed.grab(self._runtime_parameters) == sl.ERROR_CODE.SUCCESS:
                 self._zed.retrieve_image(self._image_mat, sl.VIEW.LEFT)
-                self._zed.retrieve_measure(self._measure_XYZ, sl.MEASURE.XYZ)
+                self._zed.retrieve_measure(self._measure_XYZ, sl.MEASURE.XYZ)#sl.MEASURE.CONFIDENCE
 
                 with self._lock:
                     self._image = self._image_mat.get_data().copy()

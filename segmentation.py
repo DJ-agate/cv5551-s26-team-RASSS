@@ -21,7 +21,7 @@ TCP_OFFSET = [8,-1,GRIPPER_LENGTH,0,0,0]
 
 
 
-def get_cube_segmentation(observation, target="red block"):
+def get_cube_segmentation(observation, target="green mug"):
     """
     Calculate the transformation matrix for the cube relative to the robot base frame, 
     as well as relative to the camera frame.
@@ -91,9 +91,9 @@ def get_cube_segmentation(observation, target="red block"):
         masked_pcd = o3d.geometry.PointCloud()
         masked_pcd.points = o3d.utility.Vector3dVector(masked_points) #slice to only include xyz vals
 
-        masked_pcd = masked_pcd.voxel_down_sample(voxel_size=5)
+        #masked_pcd = masked_pcd.voxel_down_sample(voxel_size=5)
         # masked_pcd = masked_pcd.
-        masked_pcd, _ = masked_pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+        masked_pcd, _ = masked_pcd.remove_statistical_outlier(nb_neighbors=40, std_ratio=2.0)
 
         cube_pcds.append(masked_pcd)
 
@@ -130,7 +130,7 @@ def main():
         # Create an Open3D visualizer
         print("about to open visual")
         cube_pcds = get_cube_segmentation([cv_image,point_cloud])
-        
+        print(cube_pcds[0])
         o3d.io.write_point_cloud("cube_point_cloud.pcd",cube_pcds[0])
         
         
