@@ -69,4 +69,9 @@ def set_floor_border(space_matrix, floor_z, border_value):
 """
 Set mug pose points in the space matrix to a border value (like 0 for unsigned distance function)
 to ensure robot is attracted to the mug grasping points
+Input:
+    space_matrix: numpy array of shape (n, 3) representing the 3D space matrix
+    mug_pose: numpy array of shape (4, 4) representing the transformation matrix of the mug pose
+    grasping_points: list of numpy arrays of shape (3,) representing the grasping points in the mug frame
+    border_value: float, the value to set for points at the mug grasping points
 """
