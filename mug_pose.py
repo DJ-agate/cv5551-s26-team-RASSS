@@ -37,19 +37,19 @@ def main():
             return
 
 
-        t_cam_cube = None
-        t_robot_cube , t_cam_cube = get_transform_cube(cv_image, camera_intrinsic, numpy.linalg.inv(t_cam_robot))
-        print(t_cam_cube)
+        t_cam_tag = None
+        t_robot_cube , t_cam_tag, tag_id = get_transform_cube(cv_image, camera_intrinsic, numpy.linalg.inv(t_cam_robot))
+        print(t_cam_tag)
 
-        t_cam_mug = get_mug_from_april(t_cam_cube, 5)
+        t_cam_mug = get_mug_from_april(t_cam_tag, tag_id)
 
-        x = 0   #Meters offset to center
-        y = 0.042
-        z = 0
-        r = Rotation.from_euler('zyx', [0,0,90], degrees=True)
-        y_square = numpy.eye(4)
-        y_square[:3,:3] = r.as_matrix()
-        y_square[:3, 3] = [x,y,z]
+        # x = 0   #Meters offset to center
+        # y = 0.042
+        # z = 0
+        # r = Rotation.from_euler('zyx', [0,0,90], degrees=True)
+        # y_square = numpy.eye(4)
+        # y_square[:3,:3] = r.as_matrix()
+        # y_square[:3, 3] = [x,y,z]
 
 
 
@@ -58,9 +58,9 @@ def main():
         # Visualization
         draw_pose_axes(cv_image, camera_intrinsic, t_cam_robot, size=TAG_SIZE)
         #draw_pose_axes(cv_image, camera_intrinsic, t_cam_cube)
-        #draw_pose_axes(cv_image, camera_intrinsic, t_cam_mug)
+        draw_pose_axes(cv_image, camera_intrinsic, t_cam_mug)
         #draw_pose_axes(cv_image, camera_intrinsic, (t_cam_mug @ numpy.linalg.inv(y_square)))
-        draw_pose_axes(cv_image, camera_intrinsic, (t_cam_mug @ y_square))
+        #draw_pose_axes(cv_image, camera_intrinsic, (t_cam_mug @ y_square))
         cv2.namedWindow('Verifying Cube Pose', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('Verifying Cube Pose', 1280, 720)
         cv2.imshow('Verifying Cube Pose', cv_image)

@@ -20,12 +20,13 @@ CUBE_TAG_SIZE = 0.0205
 
 
 def get_mug_from_april(tag_transform, tag_num):
+    print("TAG NUMBER: ", tag_num)
     # 4 cases, each for the april tags on a visible surface of the mug
-    if tag_num == 5: # bottom tag
+    if tag_num == 6: # LEFT OF HANDLE
         x = 0  #Meters offset to center
         y = 0 #-0.042
         z = 0.042
-        r = Rotation.from_euler('zyx', [0,0,0], degrees=True)
+        r = Rotation.from_euler('xyz', [-90,-108,0], degrees=True) # ORIENTATION CORRECT
         r = r.as_matrix()
 
         offset = numpy.eye(4)
@@ -33,33 +34,37 @@ def get_mug_from_april(tag_transform, tag_num):
         offset[:3, 3] = [x,y,z]
         
         mug_pose = tag_transform @ offset
-    elif tag_num == 6: # square y tag
+    elif tag_num == 7: # CENTER OPPOSITE OF HANDLE
         x = 0   #Meters offset to center
         y = 0.042
         z = 0
-        r = Rotation.from_euler('zyx', [0,0,90], degrees=True)
+        r = Rotation.from_euler('zyx', [0,0,90], degrees=True) # ORIENTATION CORRECT
         y_square = numpy.eye(4)
         y_square[:3,:3] = r.as_matrix()
         y_square[:3, 3] = [x,y,z]
 
         
         mug_pose = tag_transform @ numpy.linalg.inv(y_square)
-    elif tag_num == 7:
-        x = 0.042   #Meters offset to center
-        y = 0
-        z = 0
-        r = Rotation.from_euler('zyx', [18,0,90], degrees=True) #should be 18 degrees along z axis
+    elif tag_num == 8: #RIGHT OF HANDLE
+        x = 0.0   
+        y = 0.0
+        z = 0.042
+        r = Rotation.from_euler('zyx', [108,0,-90], degrees=True) # ORIENTATION CORRECT
+        r = r.as_matrix()
         offset = numpy.eye(4)
         offset[:3,:3] = r
         offset[:3, 3] = [x,y,z]
-    elif tag_num == 8:
-        x = 0.042   #Meters offset to center
+        mug_pose = tag_transform @ offset
+    elif tag_num == 9: # BOTTOM of MUG
+        x = 0.042
         y = 0
         z = 0
-        r = Rotation.from_euler('zyx', [18,0,90], degrees=True) #should be 18 degrees along z axis
+        r = Rotation.from_euler('zyx', [0,0,90], degrees=True) # ORIENTATION CORRECT
+        r = r.as_matrix()
         offset = numpy.eye(4)
         offset[:3,:3] = r
         offset[:3, 3] = [x,y,z]
+        mug_pose = tag_transform @ offset
     else:
         print("NONE OF THESE TAGS ARE CORRECT")
         
@@ -134,7 +139,7 @@ def get_transform_cube(observation, camera_intrinsic, camera_pose):
     # transform_mat[:3, 3] = translation.flatten()
     # transform_mat = []
 
-    return (camera_pose @ cube_pose, cube_pose)
+    return (camera_pose @ cube_pose, cube_pose, tags[0].tag_id)
 
 def get_pnp_pairs(tags):
     """
