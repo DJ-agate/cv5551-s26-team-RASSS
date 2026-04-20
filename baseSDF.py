@@ -96,8 +96,7 @@ plt.show()
 # Get transformation (model frame -> cam frame)
 handle = mesh.centroid 
 handle[0] = handle[0] + 0.06  
-roll_vector = mesh.centroid - handle
-roll = roll_vector[0]
+roll = mesh.centroid - handle
 yaw = numpy.array([0, 0, 1]) # just suppose 
 pitch = numpy.cross(roll, yaw)
 
@@ -135,3 +134,20 @@ draw_registration_result(source, target, reg_p2p.transformation)
 
 # Get the SDF value
 # trimesh.proximity.signed_distance(mesh, position)
+
+def query_SDF(q):
+    """
+    Query SDF value from mug STL file.
+
+    parameters
+    ----------
+    q: numpy.ndarray
+        A 4x4 matrix representing the current gripper pose in the model frame.
+        All translational units in this matrix are in meters ???
+    """
+    x = q[0][3]
+    y = q[1][3]
+    z = q[2][3]
+    point = [x,y,z]
+    value = trimesh.proximity.signed_distance(point)
+    return value
