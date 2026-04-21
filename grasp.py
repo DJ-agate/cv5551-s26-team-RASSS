@@ -2,48 +2,34 @@ from scipy.spatial.transform import Rotation
 import cv2, numpy, time, trimesh, math
 from baseSDF import mesh
 
-def se3t6dof(se3):
+# TODO
+T_ROBOT_MODEL = numpy.eye(4)
+
+def matrix_to_pose(m):
     """
-    Convert transformation matrix into xyzrpy.
+    Convert transformation matrix into pose (xyzrpy).
 
     """
-    x = se3[0][3] * 1000
-    y = se3[1][3] * 1000
-    z = se3[2][3] * 1000
+    x = m[0][3] 
+    y = m[1][3] 
+    z = m[2][3] 
 
-    rotation_matrix = se3[:3, :3]
+    rotation_matrix = m[:3, :3]
     r = Rotation.from_matrix(rotation_matrix)
-    roll, pitch, yaw = r.as_euler('xyz', degrees=True)
-    return x,y,z,roll,pitch,yaw
+    roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+    return x, y, z, roll, pitch, yaw
 
-def doftse3(x,y,z,roll,pitch,yaw):
+def pose_to_matrix(x,y,z,roll,pitch,yaw):
     """
-    Convert xyzrpy into transformation matrix.
+    Convert pose (xyzrpy) into transformation matrix.
 
     """
     matrix = numpy.eye(4)
-    matrix[0][3] = x
-    matrix[1][3] = y
-    matrix[2][3] = z
+    matrix[:3, 3] = [x, y, z]
     
-    R_x = numpy.array([[1, 0, 0],
-                    [0, math.cos(roll), -math.sin(roll)],
-                    [0, math.sin(roll), math.cos(roll)]
-                    ])
-                    
-    R_y = numpy.array([[math.cos(pitch), 0, math.sin(pitch)],
-                    [0, 1, 0],
-                    [-math.sin(pitch), 0, math.cos(pitch)]
-                    ])
-                
-    R_z = numpy.array([[math.cos(yaw), -math.sin(yaw), 0],
-                    [math.sin(yaw), math.cos(yaw), 0],
-                    [0, 0, 1]
-                    ])
-                    
-    R = numpy.dot(R_z, numpy.dot( R_y, R_x ))
-
-    matrix[:3, :3] = R
+    r = Rotation.from_euler('xyz', [roll, pitch, yaw], degrees=False)
+    
+    matrix[:3, :3] = r.as_matrix()
 
     return matrix
 
@@ -57,10 +43,15 @@ def query_SDF(q):
         A 4x4 matrix representing the current gripper pose in the model frame.
         All translational units in this matrix are in meters ???
     """
-    value = trimesh.proximity.signed_distance(q)
+    
+    x = q[0][3]
+    y = q[1][3]
+    z = q[2][3]
+    point = numpy.array([[x,y,z]])
+    value = trimesh.proximity.signed_distance(mesh,point)[0]
     return value
 
-def grad_contact(q, d):
+def get_contact_cost(q, d):
     """
     Calculate the distance cost between q and target grasp pose (UDP) 
     or how far is q from our ideal distance (SDF).
@@ -73,10 +64,10 @@ def grad_contact(q, d):
     d: float
         The ideal distance between gripper finger and mug rim/handle.
     """
-    contact_cost = 2*math.abs(query_SDF(q) - d)
+    contact_cost = 2*abs(query_SDF(q) - d)
     return contact_cost
 
-def grad_collision(q):
+def get_collision_cost(q):
     """
     Calculate the collision cost of current gripper pose.
 
@@ -86,35 +77,75 @@ def grad_collision(q):
         A 4x4 matrix representing the current gripper pose in the model frame.
         All translational units in this matrix are in meters ???
     """
-    left_gripper = q.copy
-    left_gripper[1][3] = left_gripper[1][3] + 0.001
-    right_gripper = q.copy
-    right_gripper[1][3] = right_gripper[1][3] + 0.001
+    left_gripper = q.copy()
+    left_gripper[1][3] = left_gripper[1][3] + 0.013
+    right_gripper = q.copy()
+    right_gripper[1][3] = right_gripper[1][3] - 0.013
     collision_cost = 2*max(0, query_SDF(left_gripper)) + 2*max(0, query_SDF(right_gripper))
     
     return collision_cost
 
-def grad_smooth(q1, q0):
+def get_smooth_cost(cur_vec, prev_vec):
     """
     Calculate the smooth cost of current gripper pose comparing with last gripper pose.
 
     parameters
     ----------
-    q1: numpy.ndarray
-        A 4x4 matrix representing the current gripper pose in the model frame.
-        All translational units in this matrix are in meters ???
-    q0: numpy.ndarray
-        A 4x4 matrix representing the last gripper pose in the model frame.
-        All translational units in this matrix are in meters ???
+    cur_vec: numpy.ndarray
+        current xyzrpy
+    prev_vec: numpy.ndarray
+        privious xyzrpy
     """
-    smooth_cost = 0.5*numpy.dot((q1-q0).T,(q1-q0))
+    smooth_cost = 0.5*numpy.dot((cur_vec-prev_vec).T,(cur_vec-prev_vec))
     return smooth_cost
 
-
-
-def grasp_with_sdf(arm, gripper_pose, d=0.005):
+def total_cost(cur_vec, prev_vec, d, t_robot_model=T_ROBOT_MODEL):
     """
-    Update grasp pose
+    Calculate total cost, including contact_cost, collision_cost and smooth_cost.
+
+    parameters
+    ----------
+    cur_vec: numpy.ndarray
+        current xyzrpy
+    prev_vec: numpy.ndarray
+        privious xyzrpy
+    d: float
+        The ideal distance between gripper finger and mug rim/handle
+        d=0.005: Suppose the unit is meter and d is 5 mm
+    t_robot_model: numpy.narray
+        A 4x4 transformation matrix representing the transformation 
+        from robot frame to model frame.
+
+    """
+    q_robot = pose_to_matrix(*cur_vec)
+    q_model = numpy.dot(t_robot_model, q_robot)
+
+    conta_cost = get_contact_cost(q_model, d)  
+    colli_cost = get_collision_cost(q_model)
+    smo_cost = get_smooth_cost(cur_vec, prev_vec)
+
+    return conta_cost + colli_cost + 0.1*smo_cost
+
+def get_grad(cur_vec, prev_vec, d, eps=1e-6, t_robot_model=T_ROBOT_MODEL):
+    """
+    Get gradient descent 
+    """
+    grad = numpy.zeros(6)
+    init_cost = total_cost(cur_vec, prev_vec, d, t_robot_model)
+    
+    for i in range(6):
+        perturbed_vec = cur_vec.copy()
+        perturbed_vec[i] += eps
+        
+        cur_cost = total_cost(perturbed_vec, prev_vec, d, t_robot_model)
+        grad[i] = (cur_cost - init_cost)/eps
+
+    return grad
+
+
+def grasp_with_sdf(arm, gripper_pose, d=0.005, t_robot_model=T_ROBOT_MODEL):
+    """
+    Update grasp pose using gradient descent 
 
     parameters
     ----------
@@ -127,25 +158,33 @@ def grasp_with_sdf(arm, gripper_pose, d=0.005):
         The ideal distance between gripper finger and mug rim/handle
         d=0.005: Suppose the unit is meter and d is 5 mm
     """
-    alpha = 0.001 
-    cur_pose = arm.get_position(is_radian=True)
-    cur_pose_m = se3t6dof(cur_pose)
+    init_vec = numpy.array(matrix_to_pose(gripper_pose))
+    cur_vec = init_vec.copy()
+    prev_vec = init_vec.copy()
 
-    while cur_cost < prev_pose or not prev_pose: 
-        if next_pose:
-            cur_pose = next_pose
-        conta_cost = grad_contact(cur_pose_m, d)  
-        colli_cost = grad_collision(cur_pose_m)
-        if prev_pose:
-            smo_cost = grad_smooth(cur_cost, prev_pose)
-            cur_cost = conta_cost + colli_cost + smo_cost
-        else:
-            cur_cost = conta_cost + colli_cost + smo_cost
-        next_pose = cur_pose + alpha*cur_cost
-        prev_pose = cur_pose
-        arm.set_position(next_pose)
- 
-    return cur_cost
+    alpha = 0.001 
+    # May add Adam optimizer later
+    # optimizer = AdamOptimizer(alpha=0.01)
+
+    max_iter = 200
+    prev_cost = total_cost(cur_vec, prev_vec, d, t_robot_model)
+    for i in range(max_iter):
+        grad = get_grad(cur_vec, init_vec, d, t_robot_model)
+        # next_vec = optimizer.step(cur_vec, grad)
+        next_vec = cur_vec - alpha * grad
+        cur_cost = total_cost(next_vec, init_vec, d, t_robot_model)
+        if abs(prev_cost - cur_cost) < 1e-4:
+            print(f"Converged at iter {i}")
+            break
+        prev_cost = cur_cost
+        cur_vec = next_vec
+
+        tx, ty, tz, tr, tp, tyaw = cur_vec
+        # Use mm as unit of robot motion
+        arm.set_position(tx*1000, ty*1000, tz*1000, tr, tp, tyaw, is_radian=True)
+
+        
+    return prev_cost
 
 
 
