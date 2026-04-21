@@ -28,8 +28,11 @@ def main():
         t_robot_cube , t_cam_tag, tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot))
         print(t_cam_tag)
         #import get_mug_transform
-        T_cam_mug = get_mug_from_april(t_cam_tag, tag_id) #todo once complete
-        #T_cam_mug = get_mug_transform() todo
+
+        t_cam_mug = get_mug_from_april(t_cam_tag, tag_id) #todo once complete
+        
+        t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
+
 
 
         # Initialize Lite6 Robot
@@ -42,7 +45,7 @@ def main():
         arm.move_gohome(wait=True)
 
         grasp_poses = []
-        usr_input = input("Press c to capture a pose, d to delete the last one, and q to quit")
+        usr_input = input("Press c to capture a pose, d to delete the last one, and q to quit \n")
         while usr_input != 'q':
             if usr_input == 'c':
                 #T_robot_pose
@@ -52,19 +55,17 @@ def main():
                 r = R.from_euler('xyz', grasp_rpy, degrees=True)
                 grasp_pose = np.eye(4)
                 grasp_pose[:3, :3] = r.as_matrix()
-
                 grasp_pose[:3, 3] = grasp_xyz
-                print(grasp_pose)
-                #T_pose_robot
-                grasp_pose = np.linalg.inv(grasp_pose)
-                #T_pose_cam
-                grasp_pose = np.linalg.inv(t_cam_robot) @ grasp_pose
-                #T_cam_pose
-                grasp_pose = np.linalg.inv(grasp_pose)
-                grasp_poses.append(grasp_pose)
+                print(grasp_pose) #T_robot_pose
+
+                T_pose_robot = np.linalg.inv(grasp_pose)
+                T_pose_mug = T_pose_robot @ t_robot_mug
+                T_mug_pose = np.linalg.inv(T_pose_mug)
+
+                grasp_poses.append(T_mug_pose)
             if usr_input == 'd':
                 grasp_poses.pop()
-            usr_input = input("Press c to capture a pose, d to delete the last one, and q to quit")
+            usr_input = input("Press c to capture a pose, d to delete the last one, and q to quit \n")
 
         with open('./poses.pkl', 'wb') as fp:
             pickle.dump(grasp_poses, fp)
