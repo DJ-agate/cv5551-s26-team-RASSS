@@ -11,7 +11,7 @@ mesh = trimesh.load(
 
 # Watertight: is closed surface
 # Trimesh only works for watertight objects
-# print("If watertight:", mesh.is_watertight)
+print("If watertight:", mesh.is_watertight)
 print("Raw extents (inch):", mesh.extents)
 print("Raw bounds (inch):", mesh.bounds)
 
@@ -135,19 +135,19 @@ draw_registration_result(source, target, reg_p2p.transformation)
 # Get the SDF value
 # trimesh.proximity.signed_distance(mesh, position)
 
-def query_SDF(q):
-    """
-    Query SDF value from mug STL file.
+# def query_SDF(q):
+#     """
+#     Query SDF value from mug STL file.
 
-    parameters
-    ----------
-    q: numpy.ndarray
-        A 4x4 matrix representing the current gripper pose in the model frame.
-        All translational units in this matrix are in meters ???
-    """
-    x = q[0][3]
-    y = q[1][3]
-    z = q[2][3]
-    point = [x,y,z]
-    value = trimesh.proximity.signed_distance(point)
-    return value
+#     parameters
+#     ----------
+#     q: numpy.ndarray
+#         A 4x4 matrix representing the current gripper pose in the model frame.
+#         All translational units in this matrix are in meters ???
+#     """
+#     x = q[0][3]
+#     y = q[1][3]
+#     z = q[2][3]
+#     point = [x,y,z]
+#     value = trimesh.proximity.signed_distance(point)
+#     return value
