@@ -29,21 +29,24 @@ def draw_pose_axes(image, camera_intrinsic, pose, size=0.1):
 def draw_grasp_poses(image, camera_intrinsic, grasp_poses, mug_pose, size=0.1):
     #draw mug frame
     draw_pose_axes(image, camera_intrinsic, mug_pose, size=0.1)
-
+    print("mug pose")
+    print(mug_pose)
     #draw grasp frames
     for grasp_pose in grasp_poses:
         # grasp pose in camera frame
+        grasp_pose[:3,3] = grasp_pose[:3,3] / 1000
         grasp_pose_cam = mug_pose @ grasp_pose
-        rvec, _ = cv2.Rodrigues(grasp_pose[:3,:3])
-        tvec = grasp_pose[:3, 3]
+    
+        print(grasp_pose_cam)
+        rvec, _ = cv2.Rodrigues(grasp_pose_cam[:3,:3])
+        tvec = grasp_pose_cam[:3, 3]
 
-        # origin and points for gripper
         frame_points = numpy.array([[0, 0, 0],
-                                    [0, 0, 0.5],
-                                    [0.25, 0, 0],
-                                    [-0.25, 0, 0]
-                                    [0.25, 0, -0.5],
-                                    [-0.25, 0. -0.25]]).reshape(-1,3) * size
+                                    [0, 0, -0.5],
+                                    [0, 0.25, 0],
+                                    [0, -0.25, 0],
+                                    [0, 0.25,0.25],
+                                    [0, -0.25, 0.25]]).reshape(-1,3) * size
 
         ipoints, _ = cv2.projectPoints(frame_points, rvec, tvec, camera_intrinsic, None)
         ipoints = numpy.round(ipoints).astype(int)
