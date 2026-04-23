@@ -59,7 +59,7 @@ grid = numpy.stack(numpy.meshgrid(x, y, z, indexing='ij'), axis=-1).astype(numpy
 # flatten -> query -> reshape
 points = grid.reshape(-1, 3)
 
-udf = query_udf(scene, points)
+udf = query_sdf(scene, points)  ### SDF/UDF
 udf = udf.reshape(N, N, N)
 
 # Visualize - 2D slice
@@ -72,10 +72,10 @@ plt.show()
 
 
 ## Select all d=0.01 area
-# d_star = 0.01
-# eps = 0.002
-# mask = (numpy.abs(udf - d_star) < eps).reshape(-1)
-# contact_points = points[mask]
+d_star = -0.01
+eps = 0.002
+mask = (numpy.abs(udf - d_star) < eps).reshape(-1)
+contact_points = points[mask]
 
 ## "Detect" handle
 # min_bound = mesh_legacy.get_min_bound()
@@ -99,16 +99,16 @@ plt.show()
 
 
 ## Visualize - 3D point cloud
-# udf_norm = (udf - udf.min()) / (udf.max() - udf.min())
-# colors = plt.cm.jet(udf_norm.flatten())[:, :3]
+udf_norm = (udf - udf.min()) / (udf.max() - udf.min())
+colors = plt.cm.jet(udf_norm.flatten())[:, :3]
 
-# pcd = o3d.geometry.PointCloud()
-# pcd.points = o3d.utility.Vector3dVector(points)
-# pcd.colors = o3d.utility.Vector3dVector(colors)
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(points)
+pcd.colors = o3d.utility.Vector3dVector(colors)
 
-# mesh_legacy.compute_vertex_normals()
+mesh_legacy.compute_vertex_normals()
 
-# o3d.visualization.draw_geometries([pcd, mesh_legacy])
+o3d.visualization.draw_geometries([pcd, mesh_legacy])
 
 
 
