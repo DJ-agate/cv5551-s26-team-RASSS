@@ -2,6 +2,7 @@
 
 import numpy as np
 import trimesh
+import open3d as o3d
 
 '''
 Description: Optimizes a trajectory
@@ -15,6 +16,7 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
+        self.q_grasps = q_grasps
         self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
         self.trajectory = self.init_trajectory(q_endeffector, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
@@ -101,18 +103,16 @@ class objective_optimizer:
             closest_point = trimesh.proximity.closest_point(mesh, q_xyz)
             dist_grad = (closest_point-q_xyz)/np.sqrt((closest_point-q_xyz)^2)
             if value > 0:
-                #do x
-                pass
+                sdf_grad_sum += dist_grad
             else:
-                # do y
-                pass
+                sdf_grad_sum -= dist_grad
+                
         return sdf_grad_sum
 
     '''
     idk bro
     '''
     def f_smooth_grad(self, q):
-        #todo
         pass
 
     '''
@@ -123,13 +123,45 @@ class objective_optimizer:
     get partial derivatives for weigths
     re-select best goal pose
 
+    
+    partial derivatives
+    U=w1*F_grasp + w2*F_collision + w3*F_smooth
+    params = [q, q_goal, w1, w2, w3]
+    dU/dq = w1*dF_grasp/d_q + w2*dF_collision/d_q + w3 * df_smooth/d_q
+    dU/dW1 = F_grasp
+    dU/dw2 = F_collision
+    dU/dw3 = F_smooth
+    q_goal is discrete, so:
+    q_goal = closest candidate pose to q, check at end
 
     '''
     def optimize_trajectory(self):
 
         #do sgd until iteration limit or objective cost below some threshold
         iteration_limit = 1000
+        lr = 10e-4
+        threshold = 1
         for it in range(iteration_limit):
             for i in range(1, self.trajectory.shape[1]):
-            # first get partial derivatives for 
-                pass
+            # first get partial derivatives for weights
+                q = self.trajectory[i]
+                q_goal_new = None
+                q_last = self.trajectory[i-1]
+                delta_w1 = lr * self.f_grasp(q, self.q_grasp)
+                delta_w2 = lr * self.f_collision(q)
+                delta_w3 = lr * self.f_smooth(q, q_last)
+                delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_last))
+                if i % 1 == 0: # change this in case recalculating the goal every time is too much
+                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q))]
+                self.w1 -= delta_w1
+                self.w2 -= delta_w2
+                self.w3 -= delta_w3
+                self.trajectory[i] += delta_q
+                if q_goal_new is not None:
+                    self.q_grasp = q_goal_new
+                
+            if it % 25 == 0: # only check every 25 iterations 
+                U = self.obj_func()
+                print("Current obj val: ", U)
+                if U < threshold:
+                    return
