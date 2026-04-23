@@ -24,6 +24,8 @@ class objective_optimizer:
         self.w2 = 1
         self.w3 = 1
 
+        self.traj_smooth_hist = []
+
     '''
     description: takes in two 6dof vectors (start and goal endeffector configs) and generates a straight trajectory between them with n steps
 
@@ -65,9 +67,22 @@ class objective_optimizer:
     
     '''
     part of obj function, not sure what this looks like yet
+    From paper: 
+        Measures dynamical quantites acroow the trajectory
+        Example given is the integral oer squared velociy norms
+    I am thinking maybe introduce an arbitrary unit of time for each step?
+
+    -we need access to the trajectory as a whole?
     '''
-    def f_smooth(self, q):
-        pass
+    def f_smooth(self, q_idx):
+        q = self.trajectory[q_idx]
+        q_last = self.trajectory[q_idx-1]
+        q_next = self.trajectory[q_idx+1]
+        
+        dist_last = np.linalg.norm(q-q_last)
+        dist_next = np.linalg.norm(q_next-q)
+
+        return dist_last + dist_next
 
     '''
     objective function, somewhat based on chomp

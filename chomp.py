@@ -1,13 +1,13 @@
-
 import cv2, time
-import numpy as np
 
 from utils.vis_utils import draw_pose_axes
 from utils.zed_camera import ZedCamera
 from transforms import get_transform_camera_robot, get_transform_cube, get_mug_from_april
-from scipy.spatial.transform import Rotation
 
-import open3d as o3d
+from objective import objective_optimizer
+
+import numpy as np
+import trimesh
 
 TAG_SIZE = 0.08
 # GRIPPER_LENGTH = 0.069 * 1000
@@ -19,9 +19,14 @@ CUBE_TAG_ID = 4
 CUBE_TAG_SIZE = 0.0205
 
 
+INIT_POSE = np.array([[ 9.99999999e-01,  3.09930336e-05,  2.70048509e-05,  0.0869530030],
+                    [ 3.09970475e-05, -9.99999988e-01, -1.48648855e-04,  0.00829000000],
+                    [ 2.70002435e-05,  1.48649692e-04, -9.99999989e-01,  0.154287003],
+                    [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+
+
 
 def main():
-
     # Initialize ZED Camera
     zed = ZedCamera()
     camera_intrinsic = zed.camera_intrinsic
@@ -43,14 +48,7 @@ def main():
 
         t_cam_mug = get_mug_from_april(t_cam_tag, tag_id)
 
-        # x = 0   #Meters offset to center
-        # y = 0.042
-        # z = 0
-        # r = Rotation.from_euler('zyx', [0,0,90], degrees=True)
-        # y_square = numpy.eye(4)
-        # y_square[:3,:3] = r.as_matrix()
-        # y_square[:3, 3] = [x,y,z]
-
+        t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
 
 
         #THESE OFFSETS WILL CHANGE, NEED TO MEASURE FINAL OFFSETS WHEN TAGS ARE GLUED TO CUP
@@ -67,7 +65,12 @@ def main():
         key = cv2.waitKey(0)
         if key == ord('k'):
             cv2.destroyAllWindows()
-        
+
+        mesh = trimesh.load_mesh("Mug_w_tags.stl")
+        mesh.apply_scale(0.02)
+        obj_opt = objective_optimizer(INIT_POSE,[t_robot_mug],[mesh])
+        obj_opt.optimize_trajectory
+
 
     finally:
         # Close Lite6 Robot
@@ -75,6 +78,8 @@ def main():
 
         # Close ZED Camera
         zed.close()
+    
 
+    pass
 if __name__ == "__main__":
     main()

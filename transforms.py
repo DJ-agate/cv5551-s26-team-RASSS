@@ -127,8 +127,8 @@ def get_transform_cube(observation, camera_intrinsic, camera_pose):
 
 
 
-    print(tags[0].pose_t.flatten())
-    print(cube_pose)
+    #print(tags[0].pose_t.flatten())
+    #print(cube_pose)
     # success, rotation_vec, translation = cv2.solvePnP(tags[0].pose_t.flatten(), tags[0].center, camera_intrinsic, None)
     # if success is not True:
     #     print('PnP Calculation Failed.')
