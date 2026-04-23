@@ -76,13 +76,14 @@ def main():
         if key == ord('k'):
             cv2.destroyAllWindows()
 
-
+        ##TODO: IMPORTANT to transform all mug poses before passing them in
         grasp_pose = t_robot_mug @ mug_poses[0]
 
         mesh = trimesh.load_mesh("Mug_w_tags.stl")
         mesh.apply_scale(0.02)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
         plot_trajectory(obj_opt.trajectory)
+        #arm.move_arc_lines(obj_opt.trajectory)
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory
@@ -104,7 +105,24 @@ def main():
         pitch = angles[1]
         yaw = angles[2]
 
-        #arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
+        for i in range(len(obj_opt.trajectory)):
+            grasp_pose = obj_opt.trajectory[i]
+            x = grasp_pose[0]
+            y = grasp_pose[1]
+            z = grasp_pose[2]
+            
+            # rot_pose = np.eye(3)
+            # rot_pose[:3][:3] = grasp_pose[0:3,0:3]
+            # rot = R.from_matrix(rot_pose)
+            
+            roll = grasp_pose[3]
+            pitch = grasp_pose[4]
+            yaw = grasp_pose[5]
+                
+            
+            arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
+            time.sleep(1)
+        # arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
         #arm.open_lite6_gripper()
         time.sleep(0.5)
         # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True, speed=200)

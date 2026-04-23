@@ -41,16 +41,20 @@ class objective_optimizer:
     return:
     trajectory: 6xn ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=50):
+    def init_trajectory(self, q_start, q_goal, n=2):
         assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
         print(q_start.shape)
+        print(q_start)
         print(q_goal.shape)
+        print(q_goal)
         delta_q = q_goal-q_start
         trajectory = np.zeros((n,6))
         trajectory[0] = q_start
         trajectory[-1] = q_goal
-        for i in range(n):
-            trajectory[i] = trajectory[i-1] + (delta_q/n)
+        print(delta_q)
+        for i in range(1, n-1):
+            trajectory[i] = trajectory[i-1] + (delta_q/(n-1))
+            print(trajectory[i])
         return trajectory
 
     '''
