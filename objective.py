@@ -4,6 +4,8 @@ import numpy as np
 import trimesh
 import open3d as o3d
 
+from utils.math_utils import matrix_to_pose
+
 '''
 Description: Optimizes a trajectory
 
@@ -16,9 +18,11 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_grasps = q_grasps
-        self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.trajectory = self.init_trajectory(q_endeffector, self.q_grasp) # init trjaectory
+        self.q_start = np.asarray([q_endeffector])
+        self.q_grasps = np.asarray([matrix_to_pose(grasp) for grasp in q_grasps])
+        #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
+        self.q_grasp = np.asarray([matrix_to_pose(q_grasps[0])])
+        self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
         self.w1 = 1
         self.w2 = 1
@@ -30,22 +34,23 @@ class objective_optimizer:
     description: takes in two 6dof vectors (start and goal endeffector configs) and generates a straight trajectory between them with n steps
 
     input:
-    q_start: 6x1 ndarray 
-    q_start: 6x1 ndarray
+    q_start: ndarray 
+    q_start: ndarray
     n: int
 
     return:
     trajectory: 6xn ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n):
-        assert q_start.shape[0]==6 and q_goal.shape[0]==6, "inputs aren't 6dof vectors"
+    def init_trajectory(self, q_start, q_goal, n=50):
+        assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
+        print(q_start.shape)
+        print(q_goal.shape)
         delta_q = q_goal-q_start
-        trajectory = q_start
+        trajectory = np.zeros((n,6))
+        trajectory[0] = q_start
+        trajectory[-1] = q_goal
         for i in range(n):
-            q_i = trajectory[i-1] + (delta_q/n)
-            trajectory.concatenate(q_i, axis=1)
-        trajectory.concatenate(q_goal)
-
+            trajectory[i] = trajectory[i-1] + (delta_q/n)
         return trajectory
 
     '''
