@@ -79,10 +79,11 @@ class objective_optimizer:
         q_last = self.trajectory[q_idx-1]
         q_next = self.trajectory[q_idx+1]
         
-        dist_last = np.linalg.norm(q-q_last)
-        dist_next = np.linalg.norm(q_next-q)
+        #dist_last = np.linalg.norm(q-q_last)
+        #dist_next = np.linalg.norm(q_next-q)
+        q_norm = np.linalg.norm(q_next - 2*q + q_last)
 
-        return dist_last + dist_next
+        return q_norm**2
 
     '''
     objective function, somewhat based on chomp
