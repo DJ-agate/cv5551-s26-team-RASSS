@@ -5,6 +5,8 @@ import trimesh
 import open3d as o3d
 import scipy
 
+from scipy.spatial.transform import RigidTransform, Rotation
+
 from utils.math_utils import matrix_to_pose
 
 '''
@@ -19,10 +21,10 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_start = np.asarray(scipy.spatial.transform.RigidTransform.from_components(q_endeffector[:3], q_endeffector[3:]))
-        self.q_grasps = np.asarray([scipy.spatial.transform.RigidTransform.from_components(grasp[:3], grasp[3:]) for grasp in q_grasps])
+        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
+        self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.q_grasp = np.asarray(scipy.spatial.transform.Rotation.RigidTransform.from_matrix(q_grasps[0]))
+        self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
         self.w1 = 1
@@ -59,8 +61,9 @@ class objective_optimizer:
         print(delta_q_rot)
         for i in range(1, n-1):
             new_xyz = trajectory[i-1].translation + step_xyz
-            new_rot = trajectory[i-1].Rotation.as_quaternion() + step_rot
-            trajectory[i] = scipy.spatial.transform.RigidTransform.from_componenents(new_xyz, new_rot)
+            #new_rot = q_start.rotation
+            new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
+            trajectory[i] = scipy.spatial.transform.RigidTransform.from_components(new_xyz, new_rot)
             # trajectory[i][3:] = 179, 0, 0
             print(trajectory[i])
         return trajectory
@@ -200,10 +203,10 @@ class objective_optimizer:
                     return
 
     def get_euler_trajectory(self):
-        euler_trajectory = np.ndarray((len(self.trajectory), 6))
+        euler_trajectory = np.ndarray((len(self.trajectory),6))
         for i in range(len(self.trajectory)):
-            euler_transform = np.ndarray(1, 6)
-            euler_transform[:3] = self.trajectory.translation
-            euler_transform[3:] = self.trajectory.rotation.as_euler()
+            euler_transform = np.ndarray((1,6))
+            euler_transform[0,:3] = np.asarray([self.trajectory[i].translation])
+            euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ', degrees=True)])
             euler_trajectory[i] = euler_transform
         return euler_trajectory

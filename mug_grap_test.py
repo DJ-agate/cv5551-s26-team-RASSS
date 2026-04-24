@@ -97,14 +97,15 @@ def main():
         mesh = trimesh.load_mesh("Mug_w_tags.stl")
         mesh.apply_scale(0.02)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
+        trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
         print("trajectory: ")
-        print(obj_opt.trajectory)
+        print(trajectory)
 
         
-        plot_trajectory(obj_opt.trajectory)
-        arm.move_arc_lines(obj_opt.trajectory)
+        plot_trajectory(np.copy(trajectory))
+        arm.move_arc_lines(trajectory)
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory
