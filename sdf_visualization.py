@@ -110,7 +110,7 @@ Parameters:
 Returns:
     (none)
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None):
     rotation_matrix = mug_transform[:3, :3]
     rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
     rotation_matrix = rotation_matrix@rot_90
@@ -148,6 +148,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     xyz_slices = [slice_2d_resolution// 2, slice_2d_resolution // 2, slice_2d_resolution // 2]
     visualize_2d_slices(sdf_2d, xyz_slices, display_2d_slices)
 
+    geom_list = []
     if trajectory is not None:
         geom_list = [add_trajectory(trajectory)]
     else:
