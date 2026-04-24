@@ -21,7 +21,7 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:]))
+        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
         self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
@@ -61,7 +61,7 @@ class objective_optimizer:
         print(delta_q_rot)
         for i in range(1, n-1):
             new_xyz = trajectory[i-1].translation + step_xyz
-            new_rot = q_start.rotation.as_quat()
+            new_rot = q_start.rotation
             # new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
             trajectory[i] = scipy.spatial.transform.RigidTransform.from_components(new_xyz, new_rot)
             # trajectory[i][3:] = 179, 0, 0
@@ -207,6 +207,6 @@ class objective_optimizer:
         for i in range(len(self.trajectory)):
             euler_transform = np.ndarray((1,6))
             euler_transform[0,:3] = np.asarray([self.trajectory[i].translation])
-            euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ')])
+            euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ', degrees=True)])
             euler_trajectory[i] = euler_transform
         return euler_trajectory
