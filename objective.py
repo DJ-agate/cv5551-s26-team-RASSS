@@ -72,16 +72,23 @@ class objective_optimizer:
     part of objective function, just the euclidean distance between a pose and the goal pose
     '''
     def f_grasp(self, q1, q2):
-        return np.linalg.norm(q2-q1)
+        dist_array = np.zeroes(6)
+        translation_delta = q1.translation-q2.translation
+        rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+        dist_array[:3] = translation_delta
+        dist_array[3:] = rot_delta
+        return np.linalg.norm(dist_array)
+    
     
     '''
     part of obj func, queries sdf for each mesh with the xyz of the current pose
     '''
     def f_collision(self, q):
+        q_translation = q.translation
         sdf_sum = 0
         for mesh in self.obj_meshes:
-            q_xyz = q[:3]  
-            value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+             
+            value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
             sdf_sum += value
         return sdf_sum
     
@@ -99,9 +106,16 @@ class objective_optimizer:
         q_last = self.trajectory[q_idx-1]
         q_next = self.trajectory[q_idx+1]
         
-        #dist_last = np.linalg.norm(q-q_last)
-        #dist_next = np.linalg.norm(q_next-q)
-        q_norm = np.linalg.norm(q_next - 2*q + q_last)
+        dist_array = np.zeroes(6)
+
+        translation_delta = q_next.translation-(2*q.translation)+ q_last.translation
+
+        rot_delta = q_next.rotation.as_quat()-(2*q.rotation.as_quat())+ q_last.rotation.as_quat()
+
+        dist_array[:3] = translation_delta
+        dist_array[3:] = rot_delta
+
+        q_norm = np.linalg.norm(dist_array)
 
         return q_norm**2
 
