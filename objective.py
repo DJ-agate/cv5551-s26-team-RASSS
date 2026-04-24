@@ -51,6 +51,17 @@ class objective_optimizer:
         trajectory[-1] = q_goal
         for i in range(n):
             trajectory[i] = trajectory[i-1] + (delta_q/n)
+        
+        # # Project endpoint to closest grasp in grasp set
+        # q_end = trajectory[-2].copy()
+        # trajectory[-1] = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q_end, axis=-1))]
+
+        # # Propagate endpoint correction back through trajectory
+        # delta_end = trajectory[-1] - q_end
+        # for i in range(1, n+1):
+        #     alpha = i/n
+        #     trajectory[i] += alpha * delta_end
+
         return trajectory
 
     '''
@@ -181,7 +192,7 @@ class objective_optimizer:
                 # delta_w3 = lr * self.f_smooth(q, q_last)
 
                 if i % 1 == 0: # change this in case recalculating the goal every time is too much
-                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q, axis=1))]
+                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q, axis=-1))]
 
                 if q_goal_new is not None:
                     self.q_grasp = q_goal_new
@@ -190,10 +201,28 @@ class objective_optimizer:
                 # self.w2 -= delta_w2
                 # self.w3 -= delta_w3
                 delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_next, q, q_last))
-                
                 self.trajectory[i] -= delta_q
+
+                # Project endpoint to closest grasp in grasp set
+                q_end = self.q_grasp.copy()
+                self.q_grasp = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q_end, axis=-1))]
+
+                # Propagate endpoint correction back through trajectory
+                delta_end = self.q_grasp - q_end
+                pts = self.trajectory.shape[0]
+                for i in range(1, pts):
+                    alpha = i/pts
+                    self.trajectory[i] += alpha * delta_end 
+
+            # (Optional) joint limit 
+            # if hasattr(self, "q_min") and hasattr(self, "q_max"):
+            #     self.trajectory = np.clip(
+            #         self.trajectory,
+            #         self.q_min,
+            #         self.q_max
+            #     )
                 
-                
+
             if it % 25 == 0: # only check every 25 iterations 
                 U = self.obj_func()
                 print("Current obj val: ", U)
