@@ -23,7 +23,7 @@ class objective_optimizer:
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
         self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
         self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
-        #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
+        #self.q_grasp = self.choose_best_grasp()
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
@@ -112,8 +112,8 @@ class objective_optimizer:
         obj_sum = 0
         for i in range(1, self.trajectory.shape[1]): # for every pose in the trajectory besides the start and end
             q = self.trajectory[i]
-            U = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(q)
-            obj_sum += U
+            U_i = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(q)
+            obj_sum += U_i
         return obj_sum
 
     
@@ -174,6 +174,7 @@ class objective_optimizer:
     def optimize_trajectory(self):
 
         #do sgd until iteration limit or objective cost below some threshold
+        #TODO: once basic optimization is working, determine betst hyperparameters
         iteration_limit = 1000
         lr = 10e-4
         threshold = 1
@@ -187,11 +188,11 @@ class objective_optimizer:
                 delta_w2 = lr * self.f_collision(q)
                 delta_w3 = lr * self.f_smooth(q, q_last)
                 delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_last))
-                if i % 1 == 0: # change this in case recalculating the goal every time is too much
-                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q))]
-                self.w1 -= delta_w1
-                self.w2 -= delta_w2
-                self.w3 -= delta_w3
+                #if i % 1 == 0: # change this in case recalculating the goal every time is too much
+                #    q_goal_new = self.choose_best_grasp()
+                self.w1 += delta_w1
+                self.w2 += delta_w2
+                self.w3 += delta_w3
                 self.trajectory[i] += delta_q
                 if q_goal_new is not None:
                     self.q_grasp = q_goal_new
@@ -210,3 +211,15 @@ class objective_optimizer:
             euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ', degrees=True)])
             euler_trajectory[i] = euler_transform
         return euler_trajectory
+    
+
+    #this is probably not the best way to choose
+    #for one, the rotation distance probably shouldn't be as important as xyz when the endeffector is far away
+    #for two, this could result in a grasp being chosen which results in a collision
+    def choose_best_grasp(self):
+        dist_sums = [None * len(self.q_grasps)]
+        for i in range(len(self.q_grasps)):
+            xyz_dist = np.linalg.norm(self.q_grasps[i].translation-self.q_start.translation)
+            rot_dist = np.linalg.norm(self.q_grasps[i].rotation.as_quat()-self.q_start.rotation.as_quat())
+        best_grasp = self.q_grasps[np.argmin(dist_sums)]
+        return best_grasp
