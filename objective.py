@@ -214,6 +214,7 @@ class objective_optimizer:
                     alpha = i/pts
                     self.trajectory[i] += alpha * delta_end 
 
+
             # (Optional) joint limit 
             # if hasattr(self, "q_min") and hasattr(self, "q_max"):
             #     self.trajectory = np.clip(
