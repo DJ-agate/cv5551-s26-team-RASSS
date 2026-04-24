@@ -12,6 +12,7 @@ import numpy as np
 from xarm.wrapper import XArmAPI
 from objective import objective_optimizer
 import trimesh
+from sdf_visualization import visualize_workspace
 
 #for robot frame
 TAG_SIZE = 0.08
@@ -66,6 +67,12 @@ def main():
 
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
         
+        # Visualize the mug with the SDF
+        worspace_boundary = [[0, 0.38], [-0.4, 0.4], [0, 0.5]]
+        visualize_workspace(t_robot_mug[:3, 3], workspace_bound=worspace_boundary, 
+                            workspace_resolution=64, display_2d_slices=False, 
+                            select_specific_dist=False, d_star=0.01, eps=0.002)
+
         #print("t_robot_mug")
         #print(t_robot_mug)
         '''

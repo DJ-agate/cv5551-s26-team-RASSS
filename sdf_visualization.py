@@ -45,40 +45,11 @@ def compute_workspace_bound(mug_center, workspace_bound):
     # Z_max
     workspace_bound[2][1] = workspace_bound[2][1] - mug_center[2]
     return workspace_bound
+
 """
-Visualize the Mug in the 3D space
-
-Parameters: 
-    mug_transform: the 4x4 transformation matrix of the mug in the world frame
-    workspace_bound: a matrix containing the workspace boundary matrix as 
-    [[x_min, x_max], [y_min, y_max], [z_min, z_max]]
-    workspace_resolution: the resolution of the workspace grid for visualization
-Returns:
-    (none)
+Compute the 3D grid points for visualization
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64):
-    
-    # Create a coordinate frame for the mug
-    # mug_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1)
-    # mug_frame.transform(mug_transform)
-
-    # # Create a bounding box for the workspace
-    # x_min, x_max = workspace_bound[0]
-    # y_min, y_max = workspace_bound[1]
-    # z_min, z_max = workspace_bound[2]
-
-    # workspace_box = o3d.geometry.AxisAlignedBoundingBox(
-    #     min_bound=[x_min, y_min, z_min],
-    #     max_bound=[x_max, y_max, z_max]
-    # )
-    # workspace_box.color = (1, 0, 0)  # Red color
-    
-    min_bound = mesh_legacy.get_min_bound()
-    max_bound = mesh_legacy.get_max_bound()
-
-    # update workspace_bound based on the center point of the mug
-    workspace_bound = compute_workspace_bound(mug_transform, workspace_bound)
-
+def compute_3d_points(workspace_bound, workspace_resolution):
     # Get the boundary values
     x_min, x_max = workspace_bound[0]
     y_min, y_max = workspace_bound[1]
@@ -93,47 +64,91 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
 
     # flatten -> query -> reshape
     points = grid.reshape(-1, 3)
+    return points
+
+"""
+Get the 2D slices of the SDF/UDF values in the workspace for visualization
+Parameters:
+    sdf: the 3D array containing the SDF/UDF values in the workspace
+    xyz_s;lices: the x, y, and z indices for 2d slices as a list
+    display_2d_slices: whether to display 2D slices of the SDF/UDF values 
+Returns:
+    (none)
+"""
+def visualize_2d_slices(sdf, xyz_slices, display_2d_slices):
+    plt.imshow(sdf[:, :, int(xyz_slices[2])], cmap='jet')
+    plt.colorbar()
+    plt.title("SDF slice (z)")
+    plt.savefig("sdf_slice_z.png")
+    if display_2d_slices:
+        plt.show()
+
+    plt.imshow(sdf[int(xyz_slices[0]), :, :], cmap='jet')
+    plt.colorbar()
+    plt.title("SDF slice (x)")
+    plt.savefig("sdf_slice_x.png")
+    if display_2d_slices:
+        plt.show()
+
+    plt.imshow(sdf[:, int(xyz_slices[1]), :], cmap='jet')
+    plt.colorbar()
+    plt.title("SDF slice (y)")
+    plt.savefig("sdf_slice_y.png")
+    if display_2d_slices:
+        plt.show()
+
+"""
+Visualize the Mug in the 3D space
+
+Parameters: 
+    mug_transform: the 4x4 transformation matrix of the mug in the world frame
+    workspace_bound: a matrix containing the workspace boundary matrix as 
+    [[x_min, x_max], [y_min, y_max], [z_min, z_max]]
+    workspace_resolution: the resolution of the workspace grid for visualization
+    display_2d_slices: whether to display 2D slices of the SDF/UDF values in the workspace
+Returns:
+    (none)
+"""
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+    # update workspace_bound based on the center point of the mug
+    workspace_bound = compute_workspace_bound(mug_transform, workspace_bound)
+
+    points = compute_3d_points(workspace_bound, workspace_resolution)
+    
 
     sdf = query_sdf(scene, points)  ### SDF/sDF
     sdf = sdf.reshape(workspace_resolution, workspace_resolution, workspace_resolution)
 
     # Visualize - 2D slice
-    mid_z = workspace_resolution // 2
-    mid_x = workspace_resolution // 2
-    mid_y = workspace_resolution // 2
-
-    plt.imshow(sdf[:, :, mid_z], cmap='jet')
-    plt.colorbar()
-    plt.title("sDF slice (z mid)")
-    plt.savefig("sdf_slice_z.png")
-    plt.show()
-
-    plt.imshow(sdf[mid_x, :, :], cmap='jet')
-    plt.colorbar()
-    plt.title("sDF slice (x mid)")
-    plt.savefig("sdf_slice_x.png")
-    plt.show()
-
-    plt.imshow(sdf[:, mid_y, :], cmap='jet')
-    plt.colorbar()
-    plt.title("sDF slice (y mid)")
-    plt.savefig("sdf_slice_y.png")
-    plt.show()
+    points_2d = compute_3d_points(workspace_bound, workspace_resolution*2)  # for 2D slice visualization
+    sdf_2d = query_sdf(scene, points_2d)  ### SDF/sDF
+    sdf_2d = sdf_2d.reshape(workspace_resolution*2, workspace_resolution*2, workspace_resolution*2)
+    xyz_slices =mug_transform #[workspace_resolution // 2, workspace_resolution // 2, workspace_resolution // 2]
+    visualize_2d_slices(sdf_2d, xyz_slices, display_2d_slices)
 
     # # Visualize the mug and the workspace
     # o3d.visualization.draw_geometries([mug_frame, workspace_box])
-    ## Visualize - 3D point cloud
-    sdf_norm = (sdf - sdf.min()) / (sdf.max() - sdf.min())
-    colors = plt.cm.jet(sdf_norm.flatten())[:, :3]
+    if select_specific_dist:
+        mask = (numpy.abs(sdf - d_star) < eps).reshape(-1)
+        contact_points = points[mask]
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(contact_points)
+        pcd.paint_uniform_color([1, 0, 0])
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points)
-    pcd.colors = o3d.utility.Vector3dVector(colors)
+        o3d.visualization.draw_geometries([pcd, mesh_legacy])
+    else:
+        ## Visualize - 3D point cloud
+        sdf_norm = (sdf - sdf.min()) / (sdf.max() - sdf.min())
+        colors = plt.cm.jet(sdf_norm.flatten())[:, :3]
 
-    # make it more visually appealing
-    mesh_legacy.compute_vertex_normals()
-    # Draw the 3d Mesh
-    o3d.visualization.draw_geometries([pcd, mesh_legacy])
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+
+        # make it more visually appealing
+        mesh_legacy.compute_vertex_normals()
+        # Draw the 3d Mesh
+        o3d.visualization.draw_geometries([pcd, mesh_legacy])
 
 #############MAIN#################
 mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
@@ -148,5 +163,5 @@ _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
 
 center = mesh_legacy.get_center()
 print("center:", center)
-center = numpy.array([0.3, -0.3, 0.039])  # for visualization purposes, we can set the center to be the middle of the workspace
-_ = visualize_workspace(center, workspace_bound, workspace_resolution=64);
+center = numpy.array([0.2, 0.3, 0.039])  # for visualization purposes, we can set the center to be the middle of the workspace
+_ = visualize_workspace(center, workspace_bound, workspace_resolution=64, display_2d_slices=False, select_specific_dist=True, d_star=0.2);
