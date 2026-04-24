@@ -1,6 +1,7 @@
 import open3d as o3d
 import numpy
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation
 
 ### Constants ###
 workspace_bound = [[0, 0.38], [-0.4, 0.4], [0, 0.5]]
@@ -109,11 +110,16 @@ Parameters:
 Returns:
     (none)
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None):
-    if mug_transform[0] > 0.5:
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+    rotation_matrix = mug_transform[:3, :3]
+    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    rotation_matrix = rotation_matrix@rot_90
+    rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('XYZ', degrees=True)
+    translation_vector = mug_transform[:3, 3]
+    if translation_vector[0] > 0.5:
         # change into meters
         for i in range(3):
-            mug_transform[i] = mug_transform[i] / 1000
+            translation_vector[i] = translation_vector[i] / 1000
     
     mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
     # Update to new format
@@ -121,10 +127,11 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     mesh.compute_vertex_normals()
     # Create a scene and add the triangle mesh
     scene = o3d.t.geometry.RaycastingScene()
+    mesh_legacy = mesh_legacy.rotate(rotation_matrix)
     _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
     
     # update workspace_bound based on the center point of the mug
-    workspace_bound = compute_workspace_bound(mug_transform, workspace_bound)
+    workspace_bound = compute_workspace_bound(translation_vector, workspace_bound)
 
     points = compute_3d_points(workspace_bound, workspace_resolution)
     
