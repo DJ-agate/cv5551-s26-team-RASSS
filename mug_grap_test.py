@@ -70,8 +70,8 @@ def main():
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.38], [-0.4, 0.4], [0, 0.5]]
         visualize_workspace(t_robot_mug[:3, 3], workspace_bound=worspace_boundary, 
-                            workspace_resolution=64, display_2d_slices=False, 
-                            select_specific_dist=False, d_star=0.01, eps=0.002)
+                           workspace_resolution=64, display_2d_slices=False, 
+                           select_specific_dist=False, d_star=0.01, eps=0.002)
 
         #print("t_robot_mug")
         #print(t_robot_mug)
@@ -97,14 +97,15 @@ def main():
         mesh = trimesh.load_mesh("Mug_w_tags.stl")
         mesh.apply_scale(0.02)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
+        trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
         print("trajectory: ")
-        print(obj_opt.trajectory)
+        print(trajectory)
 
         
-        plot_trajectory(obj_opt.trajectory)
-        arm.move_arc_lines(obj_opt.trajectory)
+        plot_trajectory(np.copy(trajectory))
+        arm.move_arc_lines(trajectory)
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory
