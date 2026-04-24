@@ -68,10 +68,10 @@ def main():
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
         
         # Visualize the mug with the SDF
-        worspace_boundary = [[0, 0.38], [-0.4, 0.4], [0, 0.5]]
+        worspace_boundary = [[0, 380], [-400, 400], [0, 500]]
         visualize_workspace(t_robot_mug[:3, 3], workspace_bound=worspace_boundary, 
-                           workspace_resolution=64, display_2d_slices=False, 
-                           select_specific_dist=False, d_star=0.01, eps=0.002)
+                            workspace_resolution=64, display_2d_slices=False, 
+                            select_specific_dist=False, d_star=10, eps=0.2)
 
         #print("t_robot_mug")
         #print(t_robot_mug)
