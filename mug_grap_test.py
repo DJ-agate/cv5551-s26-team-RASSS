@@ -42,7 +42,7 @@ def main():
     arm.set_tcp_offset(TCP_OFFSET)
     arm.set_mode(0)
     arm.set_state(0)
-    arm.move_gohome(wait=True)
+    #arm.move_gohome(wait=True)
     time.sleep(2.5)
 
     try:
@@ -97,11 +97,14 @@ def main():
         mesh = trimesh.load_mesh("Mug_w_tags.stl")
         mesh.apply_scale(0.02)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
-        print("init EE pose: ")
+        print("arm initial:")
         print(arm.get_position()[1])
+        print("trajectory: ")
+        print(obj_opt.trajectory)
+
         
         plot_trajectory(obj_opt.trajectory)
-        #arm.move_arc_lines(obj_opt.trajectory)
+        arm.move_arc_lines(obj_opt.trajectory)
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory
@@ -121,24 +124,24 @@ def main():
         # yaw = angles[2]
         # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
 
-        for i in range(len(obj_opt.trajectory)):
-            grasp_pose = obj_opt.trajectory[i]
-            x = grasp_pose[0]
-            y = grasp_pose[1]
-            z = grasp_pose[2]
+        # for i in range(len(obj_opt.trajectory)):
+        #     grasp_pose = obj_opt.trajectory[i]
+        #     x = grasp_pose[0]
+        #     y = grasp_pose[1]
+        #     z = grasp_pose[2]
             
-            # rot_pose = np.eye(3)
-            # rot_pose[:3][:3] = grasp_pose[0:3,0:3]
-            # rot = R.from_matrix(rot_pose)
+        #     # rot_pose = np.eye(3)
+        #     # rot_pose[:3][:3] = grasp_pose[0:3,0:3]
+        #     # rot = R.from_matrix(rot_pose)
             
-            roll = grasp_pose[3]
-            pitch = grasp_pose[4]
-            yaw = grasp_pose[5]
+        #     roll = grasp_pose[3]
+        #     pitch = grasp_pose[4]
+        #     yaw = grasp_pose[5]
                 
             
-            arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
-            time.sleep(1)
-        #arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
+        #     arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
+        #     time.sleep(1)
+
         #arm.open_lite6_gripper()
         time.sleep(0.5)
         # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True, speed=200)
