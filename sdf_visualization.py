@@ -130,7 +130,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
 
     # # Visualize the mug and the workspace
     # o3d.visualization.draw_geometries([mug_frame, workspace_box])
-    if select_specific_dist:
+    if select_specific_dist == True:
         mask = (numpy.abs(sdf - d_star) < eps).reshape(-1)
         contact_points = points[mask]
         pcd = o3d.geometry.PointCloud()
@@ -152,18 +152,18 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
         # Draw the 3d Mesh
         o3d.visualization.draw_geometries([pcd, mesh_legacy])
 
-#############MAIN#################
-mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
-# Update to new format
-mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh_legacy)
-mesh.compute_vertex_normals()
-# Create a scene and add the triangle mesh
-scene = o3d.t.geometry.RaycastingScene()
-_ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
+# #############MAIN#################
+# mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
+# # Update to new format
+# mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh_legacy)
+# mesh.compute_vertex_normals()
+# # Create a scene and add the triangle mesh
+# scene = o3d.t.geometry.RaycastingScene()
+# _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
 
 
 
-center = mesh_legacy.get_center()
-print("center:", center)
-center = numpy.array([0.2, 0.3, 0.039])  # for visualization purposes, we can set the center to be the middle of the workspace
-_ = visualize_workspace(center, workspace_bound, workspace_resolution=64, display_2d_slices=False, select_specific_dist=False, d_star=0.2);
+# center = mesh_legacy.get_center()
+# print("center:", center)
+# center = numpy.array([0.2, 0.3, 0.039])  # for visualization purposes, we can set the center to be the middle of the workspace
+# _ = visualize_workspace(center, workspace_bound, workspace_resolution=64, display_2d_slices=False, select_specific_dist=False, d_star=0.2);
