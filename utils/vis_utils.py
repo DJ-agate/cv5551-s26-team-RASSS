@@ -66,7 +66,7 @@ def draw_grasp_poses(image, camera_intrinsic, grasp_poses, mug_pose, size=0.1):
 
 def plot_trajectory(trajectory):
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    ax.plot(trajectory[0], trajectory[1], trajectory[2])
+    ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2])
 
     ax.set(xticklabels=[],
         yticklabels=[],

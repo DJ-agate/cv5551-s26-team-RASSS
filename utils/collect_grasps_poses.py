@@ -20,7 +20,7 @@ CUBE_TAG_ID = 4
 CUBE_TAG_SIZE = 0.0205
 
 GRIPPER_LENGTH = 0.069 * 1000
-TCP_OFFSET = [0,-2,GRIPPER_LENGTH,0,0,0]
+TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
 
 
 robot_ip = '192.168.1.172'
@@ -96,18 +96,17 @@ def main():
                 T_robot_pose = np.eye(4)
                 T_robot_pose[:3, :3] = r.as_matrix()
                 T_robot_pose[:3, 3] = grasp_xyz
+
+                print("T_robot_pose: ")
                 print(T_robot_pose) #T_robot_pose
 
-
-
                 #T_pose_robot = np.linalg.inv(T_robot_pose)
-
                 #T_pose_mug = T_pose_robot @ t_robot_mug
-
                 #T_mug_pose = np.linalg.inv(T_pose_mug)
 
                 T_mug_pose = np.linalg.inv(t_robot_mug) @ T_robot_pose 
-
+                
+                print("T_mug_pose: ")
                 print(T_mug_pose)
 
                 grasp_poses.append(T_mug_pose)

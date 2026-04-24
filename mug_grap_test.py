@@ -16,7 +16,7 @@ import trimesh
 #for robot frame
 TAG_SIZE = 0.08
 GRIPPER_LENGTH = 0.069 * 1000
-TCP_OFFSET = [0,-2,GRIPPER_LENGTH,0,0,0]
+TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
 
 
 CUBE_TAG_FAMILY = 'tag36h11'
@@ -28,6 +28,8 @@ robot_ip = '192.168.1.172'
 
 def main():
     mug_poses = np.load("poses.pkl", allow_pickle=True)
+    print("mug poses pkl:")
+    print(mug_poses[0])
     # Initialize ZED Camera
     zed = ZedCamera()
     camera_intrinsic = zed.camera_intrinsic
@@ -62,13 +64,15 @@ def main():
         
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
 
-        print(t_robot_mug)
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
+        
+        #print("t_robot_mug")
+        #print(t_robot_mug)
+        '''
+        NEEDS TO BE EDIT SAFE! USE .COPY()
+        '''
+        draw_grasp_poses(cv_image, camera_intrinsic, np.copy(mug_poses), t_cam_mug )
 
-        print(t_robot_mug)
-
-        draw_grasp_poses(cv_image, camera_intrinsic, mug_poses, t_cam_mug )
-        #draw_pose_axes(cv_image, camera_intrinsic, t_cam_cube)
         cv2.namedWindow('Verifying Cube Pose', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('Verifying Cube Pose', 1280, 720)
         cv2.imshow('Verifying Cube Pose', cv_image)
@@ -77,11 +81,18 @@ def main():
             cv2.destroyAllWindows()
 
         ##TODO: IMPORTANT to transform all mug poses before passing them in
+        
+        print("t_mug_grasp")
+        print(mug_poses[0])
         grasp_pose = t_robot_mug @ mug_poses[0]
+        print("t_robot_mug_grasp = ", grasp_pose)
 
         mesh = trimesh.load_mesh("Mug_w_tags.stl")
         mesh.apply_scale(0.02)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
+        print("init EE pose: ")
+        print(arm.get_position()[1])
+        
         plot_trajectory(obj_opt.trajectory)
         #arm.move_arc_lines(obj_opt.trajectory)
         #print(obj_opt.trajectory)
@@ -90,20 +101,18 @@ def main():
 
 
         # Grasp
-        x = grasp_pose[0][3]
-        y = grasp_pose[1][3]
-        z = grasp_pose[2][3]
+        # x = grasp_pose[0][3]
+        # y = grasp_pose[1][3]
+        # z = grasp_pose[2][3]
         
-        rot_pose = np.eye(3)
-        rot_pose[:3][:3] = grasp_pose[0:3,0:3]
-        rot = R.from_matrix(rot_pose)
-        
-        angles = rot.as_euler("xyz",degrees=True)
-
-        print("cube pose = ", grasp_pose)
-        roll = angles[0]
-        pitch = angles[1]
-        yaw = angles[2]
+        # rot_pose = np.eye(3)
+        # rot_pose[:3][:3] = grasp_pose[0:3,0:3]
+        # rot = R.from_matrix(rot_pose)
+        # angles = rot.as_euler("xyz",degrees=True)
+        # roll = angles[0]
+        # pitch = angles[1]
+        # yaw = angles[2]
+        # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
 
         for i in range(len(obj_opt.trajectory)):
             grasp_pose = obj_opt.trajectory[i]
@@ -120,9 +129,9 @@ def main():
             yaw = grasp_pose[5]
                 
             
-            arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
+            arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
             time.sleep(1)
-        # arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
+        #arm.set_position(x,y,z+40,roll,pitch,yaw,is_radian=None,wait=True)
         #arm.open_lite6_gripper()
         time.sleep(0.5)
         # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True, speed=200)

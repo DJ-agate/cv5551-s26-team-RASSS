@@ -25,7 +25,7 @@ def get_mug_from_april(tag_transform, tag_num):
     if tag_num == 6: # LEFT OF HANDLE
         x = 0  #Meters offset to center
         y = 0 #-0.042
-        z = 0.042
+        z = 0.0425
         r = Rotation.from_euler('xyz', [-90,-108,0], degrees=True) # ORIENTATION CORRECT
         r = r.as_matrix()
 
@@ -36,7 +36,7 @@ def get_mug_from_april(tag_transform, tag_num):
         mug_pose = tag_transform @ offset
     elif tag_num == 7: # CENTER OPPOSITE OF HANDLE
         x = 0   #Meters offset to center
-        y = 0.042
+        y = 0.0425
         z = 0
         r = Rotation.from_euler('zyx', [0,0,90], degrees=True) # ORIENTATION CORRECT
         y_square = numpy.eye(4)
@@ -48,7 +48,7 @@ def get_mug_from_april(tag_transform, tag_num):
     elif tag_num == 8: #RIGHT OF HANDLE
         x = 0.0   
         y = 0.0
-        z = 0.042
+        z = 0.0425
         r = Rotation.from_euler('zyx', [108,0,-90], degrees=True) # ORIENTATION CORRECT
         r = r.as_matrix()
         offset = numpy.eye(4)
@@ -56,7 +56,7 @@ def get_mug_from_april(tag_transform, tag_num):
         offset[:3, 3] = [x,y,z]
         mug_pose = tag_transform @ offset
     elif tag_num == 9: # BOTTOM of MUG
-        x = 0.042
+        x = 0.0425
         y = 0
         z = 0
         r = Rotation.from_euler('zyx', [0,0,90], degrees=True) # ORIENTATION CORRECT
