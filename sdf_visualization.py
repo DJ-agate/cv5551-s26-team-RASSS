@@ -110,6 +110,14 @@ Returns:
     (none)
 """
 def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+    mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
+    # Update to new format
+    mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh_legacy)
+    mesh.compute_vertex_normals()
+    # Create a scene and add the triangle mesh
+    scene = o3d.t.geometry.RaycastingScene()
+    _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
+    
     # update workspace_bound based on the center point of the mug
     workspace_bound = compute_workspace_bound(mug_transform, workspace_bound)
 
