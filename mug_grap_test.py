@@ -106,6 +106,12 @@ def main():
         
         plot_trajectory(np.copy(trajectory))
         arm.move_arc_lines(trajectory)
+
+
+        worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
+        visualize_workspace(t_robot_mug[:3, 3], workspace_bound=worspace_boundary, 
+                            workspace_resolution=64, display_2d_slices=False, 
+                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=trajectory)
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory

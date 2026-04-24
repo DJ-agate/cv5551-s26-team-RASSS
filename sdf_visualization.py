@@ -109,7 +109,7 @@ Parameters:
 Returns:
     (none)
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None):
     if mug_transform[0] > 0.5:
         # change into meters
         for i in range(3):
@@ -141,6 +141,11 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     xyz_slices = [slice_2d_resolution// 2, slice_2d_resolution // 2, slice_2d_resolution // 2]
     visualize_2d_slices(sdf_2d, xyz_slices, display_2d_slices)
 
+    if trajectory is not None:
+        geom_list = [add_trajectory(trajectory)]
+    else:
+        trajectory_geom = []
+    
     # # Visualize the mug and the workspace
     # o3d.visualization.draw_geometries([mug_frame, workspace_box])
     if select_specific_dist == True:
@@ -150,7 +155,6 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
         pcd.points = o3d.utility.Vector3dVector(contact_points)
         pcd.paint_uniform_color([1, 0, 0])
 
-        o3d.visualization.draw_geometries([pcd, mesh_legacy])
     else:
         ## Visualize - 3D point cloud
         sdf_norm = (sdf - sdf.min()) / (sdf.max() - sdf.min())
@@ -163,7 +167,17 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
         # make it more visually appealing
         mesh_legacy.compute_vertex_normals()
         # Draw the 3d Mesh
-        o3d.visualization.draw_geometries([pcd, mesh_legacy])
+    geom_list.append(pcd)
+    geom_list.append(mesh_legacy)
+    o3d.visualization.draw_geometries(geom_list)
+
+def add_trajectory(trajectory):
+    pose_geoms = [o3d.geometery.create_mesh_box() * len(trajectory)]
+    for i in range(len(pose_geoms)):
+        pose_geoms[i].paint_uniform_color([0,0,0])
+        pose_geoms[i] = pose_geoms[i].transform(trajectory[i][:3])
+    return pose_geoms
+    
 
 # #############MAIN#################
 # mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
