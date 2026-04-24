@@ -148,12 +148,12 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     xyz_slices = [slice_2d_resolution// 2, slice_2d_resolution // 2, slice_2d_resolution // 2]
     visualize_2d_slices(sdf_2d, xyz_slices, display_2d_slices)
 
+    mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.04, origin=(0,0.4,0))
+
     geom_list = []
     if trajectory is not None:
-        geom_list = [add_trajectory(trajectory)]
-    else:
-        trajectory_geom = []
-    
+        geom_list = add_trajectory(trajectory)
+    geom_list.append(mesh_frame)
     # # Visualize the mug and the workspace
     # o3d.visualization.draw_geometries([mug_frame, workspace_box])
     if select_specific_dist == True:
@@ -180,10 +180,16 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     o3d.visualization.draw_geometries(geom_list)
 
 def add_trajectory(trajectory):
-    pose_geoms = [o3d.geometery.create_mesh_box() * len(trajectory)]
+    pose_geoms = [o3d.geometry.TriangleMesh.create_box(height=0.01, width=0.01, depth=0.01) for _ in range(len(trajectory))]
     for i in range(len(pose_geoms)):
+        pose_mat = trajectory[i].as_matrix()
+        pose_mat[:3, 3] /= 1000
+        # pose_mat[0,3] *= -1
+        x=pose_mat[0][3]
+        pose_mat[0][3] = pose_mat[1][3]
+        pose_mat[1][3] = x
         pose_geoms[i].paint_uniform_color([0,0,0])
-        pose_geoms[i] = pose_geoms[i].transform(trajectory[i][:3])
+        pose_geoms[i] = pose_geoms[i].transform(pose_mat)
     return pose_geoms
     
 

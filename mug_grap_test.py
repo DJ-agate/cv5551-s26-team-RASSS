@@ -42,7 +42,7 @@ def main():
     arm.set_tcp_offset(TCP_OFFSET)
     arm.set_mode(0)
     arm.set_state(0)
-    #arm.move_gohome(wait=True)
+    arm.move_gohome(wait=True)
     time.sleep(2.5)
 
     try:
@@ -69,7 +69,7 @@ def main():
         
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
-        visualize_workspace(t_robot_mug, workspace_bound=worspace_boundary, 
+        visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=64, display_2d_slices=False, 
                             select_specific_dist=False, d_star=10, eps=0.2)
 
@@ -109,9 +109,9 @@ def main():
 
 
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
-        visualize_workspace(t_robot_mug[:3, 3], workspace_bound=worspace_boundary, 
-                            workspace_resolution=64, display_2d_slices=False, 
-                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=trajectory)
+        visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
+                            workspace_resolution=32, display_2d_slices=False, 
+                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
         #print(obj_opt.trajectory)
         
         # obj_opt.optimize_trajectory
