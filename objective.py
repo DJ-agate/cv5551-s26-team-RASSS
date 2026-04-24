@@ -3,6 +3,7 @@
 import numpy as np
 import trimesh
 import open3d as o3d
+import scipy
 
 from utils.math_utils import matrix_to_pose
 
@@ -13,15 +14,15 @@ Description: Optimizes a trajectory
 class objective_optimizer:
     '''
     inputs:
-    q_endeffector: initial position of endeffector, 6x1 vector
+    q_endeffector: initial position of endeffector, quaternion
     q_grasps: ndarray of candidate grasps
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_start = np.asarray([q_endeffector])
-        self.q_grasps = np.asarray([matrix_to_pose(grasp) for grasp in q_grasps])
+        self.q_start = np.asarray(scipy.spatial.transform.RigidTransform.from_components(q_endeffector[:3], q_endeffector[3:]))
+        self.q_grasps = np.asarray([scipy.spatial.transform.RigidTransform.from_components(grasp[:3], grasp[3:]) for grasp in q_grasps])
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.q_grasp = np.asarray([matrix_to_pose(q_grasps[0])])
+        self.q_grasp = np.asarray(scipy.spatial.transform.Rotation.RigidTransform.from_matrix(q_grasps[0]))
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
         self.w1 = 1
@@ -34,26 +35,33 @@ class objective_optimizer:
     description: takes in two 6dof vectors (start and goal endeffector configs) and generates a straight trajectory between them with n steps
 
     input:
-    q_start: ndarray 
-    q_start: ndarray
+    q_start: 
+    q_start: 
     n: int
 
     return:
-    trajectory: 6xn ndarray
+    trajectory: ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=2):
-        assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
-        print(q_start.shape)
-        print(q_start)
-        print(q_goal.shape)
-        print(q_goal)
-        delta_q = q_goal-q_start
-        trajectory = np.zeros((n,6))
+    def init_trajectory(self, q_start, q_goal, n=10):
+        # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
+        # print(q_start.shape)
+        # print(q_start)
+        # print(q_goal.shape)
+        # print(q_goal)
+        delta_q_xyz = q_goal.translation-q_start.translation
+        delta_q_rot = q_goal.rotation.as_quat()-q_start.rotation.as_quat()
+        trajectory = [None for i in range(n)]
         trajectory[0] = q_start
         trajectory[-1] = q_goal
-        print(delta_q)
+        step_xyz = delta_q_xyz / (n-1)
+        step_rot = delta_q_rot / (n-1)
+        print(delta_q_xyz)
+        print(delta_q_rot)
         for i in range(1, n-1):
-            trajectory[i] = trajectory[i-1] + (delta_q/(n-1))
+            new_xyz = trajectory[i-1].translation + step_xyz
+            new_rot = trajectory[i-1].Rotation.as_quaternion() + step_rot
+            trajectory[i] = scipy.spatial.transform.RigidTransform.from_componenents(new_xyz, new_rot)
+            # trajectory[i][3:] = 179, 0, 0
             print(trajectory[i])
         return trajectory
 
@@ -190,3 +198,12 @@ class objective_optimizer:
                 print("Current obj val: ", U)
                 if U < threshold:
                     return
+
+    def get_euler_trajectory(self):
+        euler_trajectory = np.ndarray((len(self.trajectory), 6))
+        for i in range(len(self.trajectory)):
+            euler_transform = np.ndarray(1, 6)
+            euler_transform[:3] = self.trajectory.translation
+            euler_transform[3:] = self.trajectory.rotation.as_euler()
+            euler_trajectory[i] = euler_transform
+        return euler_trajectory
