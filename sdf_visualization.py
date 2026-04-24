@@ -1,6 +1,7 @@
 import open3d as o3d
 import numpy
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation
 
 ### Constants ###
 workspace_bound = [[0, 0.38], [-0.4, 0.4], [0, 0.5]]
@@ -111,6 +112,9 @@ Returns:
 """
 def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
     rotation_matrix = mug_transform[:3, :3]
+    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    rotation_matrix = rotation_matrix@rot_90
+    rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('XYZ', degrees=True)
     translation_vector = mug_transform[:3, 3]
     if translation_vector[0] > 0.5:
         # change into meters
@@ -123,7 +127,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     mesh.compute_vertex_normals()
     # Create a scene and add the triangle mesh
     scene = o3d.t.geometry.RaycastingScene()
-    mesh.rotate(rotation_matrix, center=translation_vector)
+    mesh_legacy = mesh_legacy.rotate(rotation_matrix)
     _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
     
     # update workspace_bound based on the center point of the mug
