@@ -110,6 +110,11 @@ Returns:
     (none)
 """
 def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
+    if mug_transform[0] > 0.5:
+        # change into meters
+        for i in range(3):
+            mug_transform[i] = mug_transform[i] / 1000
+    
     mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
     # Update to new format
     mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh_legacy)
