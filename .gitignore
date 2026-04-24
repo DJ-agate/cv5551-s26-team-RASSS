@@ -3,4 +3,4 @@ utils/__pycache__/vis_utils.cpython-312.pyc
 __pycache__/transforms.cpython-312.pyc
 __pycache__/segmentation.cpython-312.pyc
 cube_point_cloud.pcd
-*.png
+**/*.png
