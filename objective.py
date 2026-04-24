@@ -3,6 +3,9 @@
 import numpy as np
 import trimesh
 import open3d as o3d
+import scipy
+
+from scipy.spatial.transform import RigidTransform, Rotation
 
 from utils.math_utils import matrix_to_pose
 
@@ -41,43 +44,51 @@ class objective_optimizer:
     return:
     trajectory: 6xn ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=50):
-        assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
-        print(q_start.shape)
-        print(q_goal.shape)
-        delta_q = q_goal-q_start
-        trajectory = np.zeros((n,6))
+    def init_trajectory(self, q_start, q_goal, n=10):
+        # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
+        # print(q_start.shape)
+        # print(q_start)
+        # print(q_goal.shape)
+        # print(q_goal)
+        delta_q_xyz = q_goal.translation-q_start.translation
+        delta_q_rot = q_goal.rotation.as_quat()-q_start.rotation.as_quat()
+        trajectory = [None for i in range(n)]
         trajectory[0] = q_start
         trajectory[-1] = q_goal
-        for i in range(n):
-            trajectory[i] = trajectory[i-1] + (delta_q/n)
-        
-        # # Project endpoint to closest grasp in grasp set
-        # q_end = trajectory[-2].copy()
-        # trajectory[-1] = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q_end, axis=-1))]
-
-        # # Propagate endpoint correction back through trajectory
-        # delta_end = trajectory[-1] - q_end
-        # for i in range(1, n+1):
-        #     alpha = i/n
-        #     trajectory[i] += alpha * delta_end
-
+        step_xyz = delta_q_xyz / (n-1)
+        step_rot = delta_q_rot / (n-1)
+        print(delta_q_xyz)
+        print(delta_q_rot)
+        for i in range(1, n-1):
+            new_xyz = trajectory[i-1].translation + step_xyz
+            #new_rot = q_start.rotation
+            new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
+            trajectory[i] = scipy.spatial.transform.RigidTransform.from_components(new_xyz, new_rot)
+            # trajectory[i][3:] = 179, 0, 0
+            print(trajectory[i])
         return trajectory
 
     '''
     part of objective function, just the euclidean distance between a pose and the goal pose
     '''
     def f_grasp(self, q1, q2):
-        return np.linalg.norm(q2-q1)
+        dist_array = np.zeroes(6)
+        translation_delta = q1.translation-q2.translation
+        rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+        dist_array[:3] = translation_delta
+        dist_array[3:] = rot_delta
+        return np.linalg.norm(dist_array)
+    
     
     '''
     part of obj func, queries sdf for each mesh with the xyz of the current pose
     '''
     def f_collision(self, q):
+        q_translation = q.translation
         sdf_sum = 0
         for mesh in self.obj_meshes:
-            q_xyz = q[:3]  
-            value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+             
+            value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
             sdf_sum += value
         return sdf_sum
     
@@ -90,17 +101,24 @@ class objective_optimizer:
 
     -we need access to the trajectory as a whole?
     '''
-    def f_smooth(self, q_idx):
-        q = self.trajectory[q_idx]
-        q_last = self.trajectory[q_idx-1]
-        q_next = self.trajectory[q_idx+1]
+    def f_smooth(self, q_next, q, q_last):
+        # q = self.trajectory[q_idx]
+        # q_last = self.trajectory[q_idx-1]
+        # q_next = self.trajectory[q_idx+1]
         
-        #dist_last = np.linalg.norm(q-q_last)
-        #dist_next = np.linalg.norm(q_next-q)
-        q_norm = np.linalg.norm(q_next - 2*q + q_last)
+        dist_array = np.zeroes(6)
+
+        translation_delta = q_next.translation-(2*q.translation)+ q_last.translation
+
+        rot_delta = q_next.rotation.as_quat()-(2*q.rotation.as_quat())+ q_last.rotation.as_quat()
+
+        dist_array[:3] = translation_delta
+        dist_array[3:] = rot_delta
+
+        q_norm = np.linalg.norm(dist_array)
 
         return q_norm**2
-
+    
     '''
     objective function, somewhat based on chomp
     '''
@@ -122,7 +140,14 @@ class objective_optimizer:
     cost
     '''
     def f_grasp_grad(self, q1, q2):
-        return (q2-q1)/np.sqrt((q2-q1)^2)
+        translation_delta = q1.translation-q2.translation
+        rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+
+        grad_t = (translation_delta)/np.sqrt((translation_delta)^2)
+        grad_r = (rot_delta)/np.sqrt((rot_delta)^2)
+
+        return grad_t, grad_r
+
 
     '''
     description: df_collision/dq
@@ -149,9 +174,15 @@ class objective_optimizer:
     q_last
     '''
     def f_smooth_grad(self, q_next, q, q_last):
-        return -4 *(q_next - 2*q + q_last)
+        # q = self.trajectory[q_idx]
+        # q_last = self.trajectory[q_idx-1]
+        # q_next = self.trajectory[q_idx+1]
 
-    
+        # return -4 *(q_next - 2*q + q_last)
+        grad_t = -4 *(q_next.translation - 2*q.translation + q_last.translation)
+        grad_r = -4 *(q_next.rotation.as_quat() - 2*q.rotation.as_quat() + q_last.rotation.as_quat())
+
+        return grad_t, grad_r
 
 
     '''
@@ -187,9 +218,9 @@ class objective_optimizer:
                 q_goal_new = None
                 q_last = self.trajectory[i-1]
                 q_next = self.trajectory[i+1]
-                # delta_w1 = lr * self.f_grasp(q, self.q_grasp)
-                # delta_w2 = lr * self.f_collision(q)
-                # delta_w3 = lr * self.f_smooth(q, q_last)
+                delta_w1 = lr * self.f_grasp(q, self.q_grasp)
+                delta_w2 = lr * self.f_collision(q)
+                delta_w3 = lr * self.f_smooth(q_next, q, q_last)
 
                 if i % 1 == 0: # change this in case recalculating the goal every time is too much
                     q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q, axis=-1))]
@@ -197,11 +228,19 @@ class objective_optimizer:
                 if q_goal_new is not None:
                     self.q_grasp = q_goal_new
                 
-                # self.w1 -= delta_w1
-                # self.w2 -= delta_w2
-                # self.w3 -= delta_w3
-                delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_next, q, q_last))
-                self.trajectory[i] -= delta_q
+                self.w1 -= delta_w1
+                self.w2 -= delta_w2
+                self.w3 -= delta_w3
+                # delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_next, q, q_last))
+                
+                grasp_grad_t, grasp_grad_r = self.f_grasp_grad(q, self.q_grasp)
+                smooth_grad_t, smooth_grad_r = self.f_smooth_grad(q_next, q, q_last)
+                
+                delta_q_t = lr * (grasp_grad_t + self.f_collision_grad(q) + smooth_grad_t)
+                delta_q_r = lr * (grasp_grad_r + smooth_grad_r)
+
+                self.trajectory[i][:3,3] -= delta_q_t
+                self.trajectory[i][:3,:3] -= delta_q_r
 
                 # Project endpoint to closest grasp in grasp set
                 q_end = self.q_grasp.copy()
@@ -229,3 +268,19 @@ class objective_optimizer:
                 print("Current obj val: ", U)
                 if U < threshold:
                     return
+
+    def get_euler_trajectory(self):
+        euler_trajectory = np.ndarray((len(self.trajectory),6))
+        for i in range(len(self.trajectory)):
+            euler_transform = np.ndarray((1,6))
+            euler_transform[0,:3] = np.asarray([self.trajectory[i].translation])
+            euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ', degrees=True)])
+            euler_trajectory[i] = euler_transform
+        return euler_trajectory
+    
+    '''
+    avoid using zero as denominator
+    '''
+    def avoid_zero(self, x):
+        eps = np.finfo(x.dtype).eps
+        return np.maximum(x, eps)
