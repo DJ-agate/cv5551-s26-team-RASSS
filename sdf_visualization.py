@@ -110,10 +110,12 @@ Returns:
     (none)
 """
 def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002):
-    if mug_transform[0] > 0.5:
+    rotation_matrix = mug_transform[:3, :3]
+    translation_vector = mug_transform[:3, 3]
+    if translation_vector[0] > 0.5:
         # change into meters
         for i in range(3):
-            mug_transform[i] = mug_transform[i] / 1000
+            translation_vector[i] = translation_vector[i] / 1000
     
     mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
     # Update to new format
@@ -121,10 +123,11 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     mesh.compute_vertex_normals()
     # Create a scene and add the triangle mesh
     scene = o3d.t.geometry.RaycastingScene()
+    mesh.rotate(rotation_matrix, center=translation_vector)
     _ = scene.add_triangles(mesh)  # we do not need the geometry ID for mesh
     
     # update workspace_bound based on the center point of the mug
-    workspace_bound = compute_workspace_bound(mug_transform, workspace_bound)
+    workspace_bound = compute_workspace_bound(translation_vector, workspace_bound)
 
     points = compute_3d_points(workspace_bound, workspace_resolution)
     
