@@ -61,8 +61,8 @@ class objective_optimizer:
         print(delta_q_rot)
         for i in range(1, n-1):
             new_xyz = trajectory[i-1].translation + step_xyz
-            new_rot = q_start.rotation
-            # new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
+            #new_rot = q_start.rotation
+            new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
             trajectory[i] = scipy.spatial.transform.RigidTransform.from_components(new_xyz, new_rot)
             # trajectory[i][3:] = 179, 0, 0
             print(trajectory[i])
