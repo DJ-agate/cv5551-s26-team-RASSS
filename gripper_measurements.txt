@@ -1,0 +1,17 @@
+Inner-Inner config
+
+Inner space:
+2cmX1.6cmX2cm
+
+inner space + gripper
+2cmX2.5cmX2cm
+closed: 2cmX1cmX2cm
+
+Outer-Outer config
+
+Inner space:
+2cmX2.1cmX2cm
+
+inner space + gripper
+2cmX3.1cmX2cm
+open: 2cmX3.6cmX2cm
