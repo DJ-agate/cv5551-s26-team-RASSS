@@ -2,6 +2,9 @@
 
 import numpy as np
 import trimesh
+import open3d as o3d
+
+from utils.math_utils import matrix_to_pose
 
 '''
 Description: Optimizes a trajectory
@@ -15,8 +18,11 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.trajectory = self.init_trajectory(q_endeffector, self.q_grasp) # init trjaectory
+        self.q_start = np.asarray([q_endeffector])
+        self.q_grasps = np.asarray([matrix_to_pose(grasp) for grasp in q_grasps])
+        #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
+        self.q_grasp = np.asarray([matrix_to_pose(q_grasps[0])])
+        self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
         self.w1 = 1
         self.w2 = 1
@@ -28,22 +34,27 @@ class objective_optimizer:
     description: takes in two 6dof vectors (start and goal endeffector configs) and generates a straight trajectory between them with n steps
 
     input:
-    q_start: 6x1 ndarray 
-    q_start: 6x1 ndarray
+    q_start: ndarray 
+    q_start: ndarray
     n: int
 
     return:
     trajectory: 6xn ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n):
-        assert q_start.shape[0]==6 and q_goal.shape[0]==6, "inputs aren't 6dof vectors"
+    def init_trajectory(self, q_start, q_goal, n=2):
+        assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
+        print(q_start.shape)
+        print(q_start)
+        print(q_goal.shape)
+        print(q_goal)
         delta_q = q_goal-q_start
-        trajectory = q_start
-        for i in range(n):
-            q_i = trajectory[i-1] + (delta_q/n)
-            trajectory.concatenate(q_i, axis=1)
-        trajectory.concatenate(q_goal)
-
+        trajectory = np.zeros((n,6))
+        trajectory[0] = q_start
+        trajectory[-1] = q_goal
+        print(delta_q)
+        for i in range(1, n-1):
+            trajectory[i] = trajectory[i-1] + (delta_q/(n-1))
+            print(trajectory[i])
         return trajectory
 
     '''
@@ -77,21 +88,20 @@ class objective_optimizer:
         q_last = self.trajectory[q_idx-1]
         q_next = self.trajectory[q_idx+1]
         
-        dist_last = np.linalg.norm(q-q_last)
-        dist_next = np.linalg.norm(q_next-q)
+        #dist_last = np.linalg.norm(q-q_last)
+        #dist_next = np.linalg.norm(q_next-q)
+        q_norm = np.linalg.norm(q_next - 2*q + q_last)
 
-        return dist_last + dist_next
+        return q_norm**2
 
     '''
     objective function, somewhat based on chomp
     '''
     def obj_func(self):
         obj_sum = 0
-
-        #What if instead we sum the terms individually, and then sum them after iterating through trrajectory
         for i in range(1, self.trajectory.shape[1]): # for every pose in the trajectory besides the start and end
             q = self.trajectory[i]
-            U = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(i)
+            U = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(q)
             obj_sum += U
         return obj_sum
 
@@ -118,20 +128,16 @@ class objective_optimizer:
             closest_point = trimesh.proximity.closest_point(mesh, q_xyz)
             dist_grad = (closest_point-q_xyz)/np.sqrt((closest_point-q_xyz)^2)
             if value > 0:
-                #do x
-                pass
+                sdf_grad_sum += dist_grad
             else:
-                # do y
-                pass
+                sdf_grad_sum -= dist_grad
+                
         return sdf_grad_sum
 
     '''
-    The f smooth function gives distance sum of the point ahead 
-    and behind the current trajectory point
+    idk bro
     '''
     def f_smooth_grad(self, q):
-        
-        #todo
         pass
 
     '''
@@ -142,13 +148,45 @@ class objective_optimizer:
     get partial derivatives for weigths
     re-select best goal pose
 
+    
+    partial derivatives
+    U=w1*F_grasp + w2*F_collision + w3*F_smooth
+    params = [q, q_goal, w1, w2, w3]
+    dU/dq = w1*dF_grasp/d_q + w2*dF_collision/d_q + w3 * df_smooth/d_q
+    dU/dW1 = F_grasp
+    dU/dw2 = F_collision
+    dU/dw3 = F_smooth
+    q_goal is discrete, so:
+    q_goal = closest candidate pose to q, check at end
 
     '''
     def optimize_trajectory(self):
 
         #do sgd until iteration limit or objective cost below some threshold
         iteration_limit = 1000
+        lr = 10e-4
+        threshold = 1
         for it in range(iteration_limit):
             for i in range(1, self.trajectory.shape[1]):
-            # first get partial derivatives for 
-                pass
+            # first get partial derivatives for weights
+                q = self.trajectory[i]
+                q_goal_new = None
+                q_last = self.trajectory[i-1]
+                delta_w1 = lr * self.f_grasp(q, self.q_grasp)
+                delta_w2 = lr * self.f_collision(q)
+                delta_w3 = lr * self.f_smooth(q, q_last)
+                delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_last))
+                if i % 1 == 0: # change this in case recalculating the goal every time is too much
+                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q))]
+                self.w1 -= delta_w1
+                self.w2 -= delta_w2
+                self.w3 -= delta_w3
+                self.trajectory[i] += delta_q
+                if q_goal_new is not None:
+                    self.q_grasp = q_goal_new
+                
+            if it % 25 == 0: # only check every 25 iterations 
+                U = self.obj_func()
+                print("Current obj val: ", U)
+                if U < threshold:
+                    return
