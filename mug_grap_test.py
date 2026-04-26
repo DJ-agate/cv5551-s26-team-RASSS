@@ -94,9 +94,10 @@ def main():
         grasp_pose = t_robot_mug @ mug_poses[0]
         print("t_robot_mug_grasp = ", grasp_pose)
 
-        mesh = trimesh.load_mesh("Mug_w_tags.stl")
-        mesh.apply_scale(0.02)
-        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh])
+        mesh = trimesh.load_mesh("Mug_wo_tags.stl")
+        # mesh.apply_scale(0.02)
+        T_mug_robot = np.linalg.inv(t_robot_mug)
+        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
@@ -104,6 +105,9 @@ def main():
         print(trajectory)
 
         
+        plot_trajectory(np.copy(trajectory))
+        obj_opt.optimize_trajectory()
+        trajectory= obj_opt.get_euler_trajectory()
         plot_trajectory(np.copy(trajectory))
         arm.move_arc_lines(trajectory)
 

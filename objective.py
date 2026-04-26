@@ -20,16 +20,18 @@ class objective_optimizer:
     q_grasps: ndarray of candidate grasps
     obj_meshes: list of object meshes
     '''    
-    def __init__(self, q_endeffector, q_grasps, obj_meshes):
+    def __init__(self, q_endeffector, q_grasps, obj_meshes,t_mug_robot):
         self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
         self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
-        self.w1 = 1
-        self.w2 = 1
-        self.w3 = 1
+        self.w1 = -1
+        self.w2 = 1.5
+        self.w3 = -.01
+
+        self.T_mug_robot = RigidTransform.from_matrix(t_mug_robot)
 
         self.traj_smooth_hist = []
 
@@ -44,7 +46,7 @@ class objective_optimizer:
     return:
     trajectory: ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=10):
+    def init_trajectory(self, q_start, q_goal, n=50):
         # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
         # print(q_start.shape)
         # print(q_start)
@@ -84,7 +86,8 @@ class objective_optimizer:
     part of obj func, queries sdf for each mesh with the xyz of the current pose
     '''
     def f_collision(self, q):
-        q_translation = q.translation
+        q_translation = [q.translation.T]
+        # print(q_translation.shape)
         sdf_sum = 0
         for mesh in self.obj_meshes:
              
@@ -121,9 +124,11 @@ class objective_optimizer:
     '''
     def obj_func(self):
         obj_sum = 0
-        for i in range(1, self.trajectory.shape[1]): # for every pose in the trajectory besides the start and end
+        for i in range(1, len(self.trajectory)-1): # for every pose in the trajectory besides the start and end
+            q_next = self.trajectory[i+1]
             q = self.trajectory[i]
-            U = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(q)
+            q_last = self.trajectory[i-1]
+            U = self.w1 * self.f_grasp(q, self.q_grasp) + self.w2 * self.f_collision(q) + self.w3 * self.f_smooth(q_next, q, q_last)
             obj_sum += U
         return obj_sum
 
@@ -140,8 +145,8 @@ class objective_optimizer:
         translation_delta = q1.translation-q2.translation
         rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
 
-        grad_t = (translation_delta)/np.sqrt((translation_delta)^2)
-        grad_r = (rot_delta)/np.sqrt((rot_delta)^2)
+        grad_t = (translation_delta)/np.sqrt((translation_delta)**2)
+        grad_r = (rot_delta)/np.sqrt((rot_delta)**2)
 
         return grad_t, grad_r
 
@@ -151,11 +156,15 @@ class objective_optimizer:
     '''
     def f_collision_grad(self, q):
         sdf_grad_sum = 0
+
+        
+        p_mug_q = self.T_mug_robot * q
+
         for mesh in self.obj_meshes:
-            q_xyz = q[:3]  
-            value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
-            closest_point = trimesh.proximity.closest_point(mesh, q_xyz)
-            dist_grad = (closest_point-q_xyz)/np.sqrt((closest_point-q_xyz)^2)
+            q_xyz = [p_mug_q.translation.T] 
+            value = 2*trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+            closest_point = trimesh.proximity.closest_point(mesh, q_xyz)[0]
+            dist_grad = (closest_point-q_xyz)/np.sqrt((closest_point-q_xyz)**2)
             if value > 0:
                 sdf_grad_sum += dist_grad
             else:
@@ -206,28 +215,29 @@ class objective_optimizer:
 
         #do sgd until iteration limit or objective cost below some threshold
         iteration_limit = 1000
-        lr = 10e-4
+        lr = 10e-3
         threshold = 1
+        U_last = 0
         for it in range(iteration_limit):
-            for i in range(1, self.trajectory.shape[0]-1):
+            for i in range(1, len(self.trajectory)-1):
             # first get partial derivatives for weights
                 q = self.trajectory[i]
                 q_goal_new = None
                 q_last = self.trajectory[i-1]
                 q_next = self.trajectory[i+1]
-                delta_w1 = lr * self.f_grasp(q, self.q_grasp)
-                delta_w2 = lr * self.f_collision(q)
-                delta_w3 = lr * self.f_smooth(q_next, q, q_last)
+                # delta_w1 = lr * self.f_grasp(q, self.q_grasp)
+                # delta_w2 = lr * self.f_collision(q)
+                # delta_w3 = lr * self.f_smooth(q_next, q, q_last)
 
-                if i % 1 == 0: # change this in case recalculating the goal every time is too much
-                    q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q, axis=-1))]
+                # if i % 1 == 0: # change this in case recalculating the goal every time is too much
+                #     q_goal_new = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q, axis=-1))]
 
-                if q_goal_new is not None:
-                    self.q_grasp = q_goal_new
+                # if q_goal_new is not None:
+                #     self.q_grasp = q_goal_new
                 
-                self.w1 -= delta_w1
-                self.w2 -= delta_w2
-                self.w3 -= delta_w3
+                # self.w1 -= delta_w1
+                # self.w2 -= delta_w2
+                # self.w3 -= delta_w3
                 # delta_q = lr * (self.w1 * self.f_grasp_grad(q, self.q_grasp) + self.w2 * self.f_collision_grad(q) + self.w3 * self.f_smooth_grad(q, q_next, q, q_last))
                 
                 grasp_grad_t, grasp_grad_r = self.f_grasp_grad(q, self.q_grasp)
@@ -236,19 +246,22 @@ class objective_optimizer:
                 delta_q_t = lr * (grasp_grad_t + self.f_collision_grad(q) + smooth_grad_t)
                 delta_q_r = lr * (grasp_grad_r + smooth_grad_r)
 
-                self.trajectory[i][:3,3] -= delta_q_t
-                self.trajectory[i][:3,:3] -= delta_q_r
+                new_pose = RigidTransform.from_components(self.trajectory[i].translation - delta_q_t.flatten(), Rotation.from_quat(self.trajectory[i].rotation.as_quat()-delta_q_r.flatten()))
+                self.trajectory[i] = new_pose
+
+                # self.trajectory[i].translation -= delta_q_t.flatten()
+                # self.trajectory[i].translation -= delta_q_r.flatten()
 
                 # Project endpoint to closest grasp in grasp set
-                q_end = self.q_grasp.copy()
-                self.q_grasp = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q_end, axis=-1))]
+                # q_end = self.q_grasp.copy()
+                # self.q_grasp = self.q_grasps[np.argmin(np.linalg.norm(self.q_grasps-q_end, axis=-1))]
 
-                # Propagate endpoint correction back through trajectory
-                delta_end = self.q_grasp - q_end
-                pts = self.trajectory.shape[0]
-                for i in range(1, pts):
-                    alpha = i/pts
-                    self.trajectory[i] += alpha * delta_end 
+                # # Propagate endpoint correction back through trajectory
+                # delta_end = self.q_grasp - q_end
+                # pts = len(self.trajectory)
+                # for i in range(1, pts):
+                #     alpha = i/pts
+                #     self.trajectory[i] += alpha * delta_end 
 
 
             # (Optional) joint limit 
@@ -261,10 +274,16 @@ class objective_optimizer:
                 
 
             if it % 25 == 0: # only check every 25 iterations 
+                
                 U = self.obj_func()
+                print(it)
                 print("Current obj val: ", U)
-                if U < threshold:
+                print(self.w1)
+                print(self.w2)
+                print(self.w3)
+                if np.abs(U-U_last) < 1:
                     return
+                U_last = U
 
     def get_euler_trajectory(self):
         euler_trajectory = np.ndarray((len(self.trajectory),6))
