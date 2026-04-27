@@ -93,10 +93,13 @@ class objective_optimizer:
         q_translation = [p_mug_q.translation.T]
         # print(q_translation.shape)
         sdf_sum = 0
+        # for mesh in self.obj_meshes:
+        #     value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
+        #     sdf_sum += value
         for mesh in self.obj_meshes:
-             
-            value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
-            sdf_sum += value
+            q_translation = q[:3].T  
+            value = trimesh.proximity.signed_distance(mesh, q_translation)[0]
+            sdf_sum += max(0.0, value) ** 2
         return sdf_sum
     
     '''
@@ -158,7 +161,7 @@ class objective_optimizer:
     '''
     description: df_collision/dq
     '''
-    def f_collision_grad(self, q):
+    def f_collision_grad(self, q, eps=1e-6):
         sdf_grad_sum = 0
 
         
@@ -166,16 +169,28 @@ class objective_optimizer:
         
 
         for mesh in self.obj_meshes:
-            q_xyz = [p_mug_q.translation.T] 
-            value = 2*trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+            q_xyz = q[:3].T  
+            value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
             closest_point = trimesh.proximity.closest_point(mesh, q_xyz)[0]
-            dist_grad = (closest_point-q_xyz)/np.sqrt((closest_point-q_xyz)**2)
-            if value > 0:
-                sdf_grad_sum += dist_grad
-            else:
-                sdf_grad_sum -= dist_grad
+
+            # No collision
+            if value <= 0:
+                continue
+
+            direction = q_xyz[0] - closest_point
+            norm = np.linalg.norm(direction)
+
+            if norm < eps:
+                continue
+
+            sdf_grad = direction / norm
+
+            # cost = value**2
+            # grad = 2 * value * grad_value
+            sdf_grad_sum += 2 * value * sdf_grad
                 
         return sdf_grad_sum
+
 
     '''
     description: q_norm = np.linalg.norm(q_next - 2*q + q_last), dq_norm/dq
