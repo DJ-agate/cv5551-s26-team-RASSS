@@ -16,15 +16,15 @@ Description: Optimizes a trajectory
 class objective_optimizer:
     '''
     inputs:
-    q_endeffector: initial position of endeffector, 6x1 vector
+    q_endeffector: initial position of endeffector, quaternion
     q_grasps: ndarray of candidate grasps
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes):
-        self.q_start = np.asarray([q_endeffector])
-        self.q_grasps = np.asarray([matrix_to_pose(grasp) for grasp in q_grasps])
+        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
+        self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.q_grasp = np.asarray([matrix_to_pose(q_grasps[0])])
+        self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
         self.w1 = 1
@@ -37,12 +37,12 @@ class objective_optimizer:
     description: takes in two 6dof vectors (start and goal endeffector configs) and generates a straight trajectory between them with n steps
 
     input:
-    q_start: ndarray 
-    q_start: ndarray
+    q_start: 
+    q_start: 
     n: int
 
     return:
-    trajectory: 6xn ndarray
+    trajectory: ndarray
     '''
     def init_trajectory(self, q_start, q_goal, n=10):
         # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
@@ -72,7 +72,7 @@ class objective_optimizer:
     part of objective function, just the euclidean distance between a pose and the goal pose
     '''
     def f_grasp(self, q1, q2):
-        dist_array = np.zeroes(6)
+        dist_array = np.zeros(7)
         translation_delta = q1.translation-q2.translation
         rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
         dist_array[:3] = translation_delta
@@ -105,11 +105,8 @@ class objective_optimizer:
     -we need access to the trajectory as a whole?
     '''
     def f_smooth(self, q_next, q, q_last):
-        # q = self.trajectory[q_idx]
-        # q_last = self.trajectory[q_idx-1]
-        # q_next = self.trajectory[q_idx+1]
         
-        dist_array = np.zeroes(6)
+        dist_array = np.zeros(7)
 
         translation_delta = q_next.translation-(2*q.translation)+ q_last.translation
 

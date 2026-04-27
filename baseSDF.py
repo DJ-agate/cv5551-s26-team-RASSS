@@ -39,6 +39,7 @@ voxel_size = 0.005   # 5 mm
 padding = 0.01       # 1 cm
 
 bounds = mesh.bounds.copy()
+# Make the bounds the same as the workspace
 bounds[0] -= padding
 bounds[1] += padding
 
