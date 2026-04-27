@@ -25,6 +25,7 @@ CUBE_TAG_ID = 4
 CUBE_TAG_SIZE = 0.0205
 
 robot_ip = '192.168.1.172'
+INIT_POSE = [86.954865, 0.818719, 85.287003, 179.991483, -0.001547, 0.001776]
 
 
 def main():
@@ -93,11 +94,14 @@ def main():
         print(mug_poses[0])
         grasp_pose = t_robot_mug @ mug_poses[0]
         print("t_robot_mug_grasp = ", grasp_pose)
+        
+        # trimesh.creation.cylinder
 
         mesh = trimesh.load_mesh("Mug_wo_tags.stl")
         # mesh.apply_scale(0.02)
         T_mug_robot = np.linalg.inv(t_robot_mug)
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh],T_mug_robot)
+        # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
@@ -117,8 +121,6 @@ def main():
                             workspace_resolution=32, display_2d_slices=False, 
                             select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
         #print(obj_opt.trajectory)
-        
-        # obj_opt.optimize_trajectory
 
 
         # Grasp

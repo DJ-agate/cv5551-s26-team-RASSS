@@ -27,9 +27,9 @@ class objective_optimizer:
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
         self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         self.obj_meshes = obj_meshes
-        self.w1 = -1
-        self.w2 = 1.5
-        self.w3 = -.01
+        self.w1 = 1.0
+        self.w2 = -1.0
+        self.w3 = .1
 
         self.T_mug_robot = RigidTransform.from_matrix(t_mug_robot)
 
@@ -86,7 +86,11 @@ class objective_optimizer:
     part of obj func, queries sdf for each mesh with the xyz of the current pose
     '''
     def f_collision(self, q):
-        q_translation = [q.translation.T]
+        # q_translation = [q.translation.T]
+
+        p_mug_q = self.T_mug_robot * q
+        # p_q_mug = p_mug_q.inv()
+        q_translation = [p_mug_q.translation.T]
         # print(q_translation.shape)
         sdf_sum = 0
         for mesh in self.obj_meshes:
@@ -159,6 +163,7 @@ class objective_optimizer:
 
         
         p_mug_q = self.T_mug_robot * q
+        
 
         for mesh in self.obj_meshes:
             q_xyz = [p_mug_q.translation.T] 
@@ -214,7 +219,7 @@ class objective_optimizer:
     def optimize_trajectory(self):
 
         #do sgd until iteration limit or objective cost below some threshold
-        iteration_limit = 1000
+        iteration_limit = 2000
         lr = 10e-3
         threshold = 1
         U_last = 0
