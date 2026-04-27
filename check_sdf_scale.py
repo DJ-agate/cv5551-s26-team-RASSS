@@ -25,26 +25,42 @@ CUBE_TAG_ID = 4
 CUBE_TAG_SIZE = 0.0205
 
 robot_ip = '192.168.1.172'
-INIT_ARM = [86.954865, 0.818719, 85.287003, 179.991483, -0.001547, 0.001776]
-INIT_POSE = RigidTransform.from_components(INIT_ARM[:3], Rotation.from_euler('XYZ', INIT_ARM[3:], degrees=True))
+
+
+def f_grasp(q1, q2):
+    dist_array = np.zeros(7)
+    translation_delta = q1.translation-q2.translation
+    rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+    dist_array[:3] = translation_delta
+    dist_array[3:] = rot_delta
+    return np.linalg.norm(dist_array)
+
 
 def main():
     mug_poses = np.load("poses.pkl", allow_pickle=True)
     print("mug poses pkl:")
     print(mug_poses[0])
+
     # Initialize ZED Camera
     zed = ZedCamera()
     camera_intrinsic = zed.camera_intrinsic
 
+    # Initialize Lite6 Robot
+    arm = XArmAPI(robot_ip)
+    arm.connect()
+    arm.motion_enable(enable=True)
+    arm.set_tcp_offset(TCP_OFFSET)
+    arm.set_mode(0)
+    arm.set_state(0)
+    # arm.move_gohome(wait=True)
     time.sleep(2.5)
+
 
     try:
         # Get Observation
         cv_image = zed.image
 
-        
-        cv_image = zed.image
-
+    
         # Get Transformation
         t_cam_robot = get_transform_camera_robot(cv_image, camera_intrinsic)
         # if t_cam_robot is None:
@@ -88,14 +104,20 @@ def main():
         print("t_robot_mug_grasp = ", grasp_pose)
 
         mesh = trimesh.load_mesh("Mug_wo_tags.stl")
-        mesh.apply_scale(1.0)
+        mesh.apply_scale(1000.0)
         
         T_mug_robot = RigidTransform.from_matrix(np.linalg.inv(t_robot_mug))
+        INIT_ARM = arm.get_position()[1]
+        INIT_POSE = RigidTransform.from_components(INIT_ARM[:3], Rotation.from_euler('XYZ', INIT_ARM[3:], degrees=True))
+
 
         p_mug_q = T_mug_robot * INIT_POSE
         print("p_mug_q")
         print(p_mug_q)
-        
+
+        T_grasp_pose = RigidTransform.from_matrix(grasp_pose)
+
+        grasp_dist = f_grasp(INIT_POSE, T_grasp_pose)
 
         p_mug_q = [p_mug_q.translation.T]
 
@@ -106,6 +128,8 @@ def main():
         print(value)
         print("closest_point")
         print(closest_point)
+        print("grasp_dist")
+        print(grasp_dist)
 
         
     finally:

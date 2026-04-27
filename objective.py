@@ -25,11 +25,15 @@ class objective_optimizer:
         self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
-        self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
+
+
+        self.trajectory = self.init_trajectory(self.q_start, RigidTransform.from_components(self.q_start.translation+[0,200,0],self.q_start.rotation)) # init trjaectory
+        # self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
+        
         self.obj_meshes = obj_meshes
-        self.w1 = 1.0
-        self.w2 = -1.0
-        self.w3 = .1
+        self.w1 = 0#1.2
+        self.w2 = 60
+        self.w3 = 0.8
 
         self.T_mug_robot = RigidTransform.from_matrix(t_mug_robot)
 
@@ -46,7 +50,7 @@ class objective_optimizer:
     return:
     trajectory: ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=50):
+    def init_trajectory(self, q_start, q_goal, n=35):
         # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
         # print(q_start.shape)
         # print(q_start)
@@ -75,8 +79,8 @@ class objective_optimizer:
     '''
     def f_grasp(self, q1, q2):
         dist_array = np.zeros(7)
-        translation_delta = q1.translation-q2.translation
-        rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+        translation_delta = q2.translation-q1.translation
+        rot_delta = q2.rotation.as_quat()-q1.rotation.as_quat()
         dist_array[:3] = translation_delta
         dist_array[3:] = rot_delta
         return np.linalg.norm(dist_array)
@@ -90,16 +94,16 @@ class objective_optimizer:
 
         p_mug_q = self.T_mug_robot * q
         # p_q_mug = p_mug_q.inv()
-        q_translation = [p_mug_q.translation.T]
+        # q_translation = [p_mug_q.translation.T]
         # print(q_translation.shape)
         sdf_sum = 0
         # for mesh in self.obj_meshes:
         #     value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
         #     sdf_sum += value
         for mesh in self.obj_meshes:
-            q_translation = q[:3].T  
+            q_translation = [p_mug_q.translation.T]  
             value = trimesh.proximity.signed_distance(mesh, q_translation)[0]
-            sdf_sum += max(0.0, value) ** 2
+            sdf_sum += value #min(0.0, value) # ** 2 # needs to be minimum as distances are negative
         return sdf_sum
     
     '''
@@ -149,11 +153,11 @@ class objective_optimizer:
     cost
     '''
     def f_grasp_grad(self, q1, q2):
-        translation_delta = q1.translation-q2.translation
-        rot_delta = q1.rotation.as_quat()-q2.rotation.as_quat()
+        translation_delta = q2.translation-q1.translation
+        rot_delta = q2.rotation.as_quat()-q1.rotation.as_quat()
 
-        grad_t = (translation_delta)/np.sqrt((translation_delta)**2)
-        grad_r = (rot_delta)/np.sqrt((rot_delta)**2)
+        grad_t = (translation_delta)/self.avoid_zero(np.sqrt((translation_delta)**2))
+        grad_r = (rot_delta)/self.avoid_zero(np.sqrt((rot_delta)**2))
 
         return grad_t, grad_r
 
@@ -162,33 +166,42 @@ class objective_optimizer:
     description: df_collision/dq
     '''
     def f_collision_grad(self, q, eps=1e-6):
-        sdf_grad_sum = 0
+        sdf_grad_sum = np.zeros((1,3))
 
         
         p_mug_q = self.T_mug_robot * q
         
 
+        # for mesh in self.obj_meshes:
+        #     q_xyz = [p_mug_q.translation.T]  
+        #     value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+        #     closest_point = trimesh.proximity.closest_point(mesh, q_xyz)[0]
+            
+            
+        #     # No collision
+        #     if value >= 0:
+        #         direction = q_xyz[0] - closest_point
+        #         norm = np.linalg.norm(direction)
+
+        #         if norm > eps:
+        #             sdf_grad = direction / norm
+
+        #             # cost = value**2
+        #             # grad = 2 * value * grad_value
+        #             sdf_grad_sum += 2 * value * sdf_grad
+        #     else:
+        #         sdf_grad_sum += 2 * value
         for mesh in self.obj_meshes:
-            q_xyz = q[:3].T  
+            q_xyz = [p_mug_q.translation.T]   
             value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
+            # print(value)
             closest_point = trimesh.proximity.closest_point(mesh, q_xyz)[0]
-
-            # No collision
-            if value <= 0:
-                continue
-
-            direction = q_xyz[0] - closest_point
-            norm = np.linalg.norm(direction)
-
-            if norm < eps:
-                continue
-
-            sdf_grad = direction / norm
-
-            # cost = value**2
-            # grad = 2 * value * grad_value
-            sdf_grad_sum += 2 * value * sdf_grad
-                
+            dist_grad = (closest_point-q_xyz)/self.avoid_zero(np.sqrt((closest_point-q_xyz)**2))
+            if value > -40:
+                sdf_grad_sum += dist_grad
+        # if np.any([x!=0 for x in sdf_grad_sum]):
+        #     print("sum")
+        #     print(sdf_grad_sum)
         return sdf_grad_sum
 
 
@@ -235,7 +248,7 @@ class objective_optimizer:
 
         #do sgd until iteration limit or objective cost below some threshold
         iteration_limit = 2000
-        lr = 10e-3
+        lr = 1e-2
         threshold = 1
         U_last = 0
         for it in range(iteration_limit):
@@ -244,7 +257,9 @@ class objective_optimizer:
                 q = self.trajectory[i]
                 q_goal_new = None
                 q_last = self.trajectory[i-1]
+               
                 q_next = self.trajectory[i+1]
+             
                 # delta_w1 = lr * self.f_grasp(q, self.q_grasp)
                 # delta_w2 = lr * self.f_collision(q)
                 # delta_w3 = lr * self.f_smooth(q_next, q, q_last)
@@ -262,11 +277,20 @@ class objective_optimizer:
                 
                 grasp_grad_t, grasp_grad_r = self.f_grasp_grad(q, self.q_grasp)
                 smooth_grad_t, smooth_grad_r = self.f_smooth_grad(q_next, q, q_last)
-                
-                delta_q_t = lr * (grasp_grad_t + self.f_collision_grad(q) + smooth_grad_t)
-                delta_q_r = lr * (grasp_grad_r + smooth_grad_r)
+         
 
-                new_pose = RigidTransform.from_components(self.trajectory[i].translation - delta_q_t.flatten(), Rotation.from_quat(self.trajectory[i].rotation.as_quat()-delta_q_r.flatten()))
+                delta_q_t = lr * (self.w1 * grasp_grad_t + self.w2 * self.f_collision_grad(q) - 0.8 * smooth_grad_t)
+                delta_q_r = lr * (self.w1 * grasp_grad_r - 0.8 * smooth_grad_r)
+
+                # if delta_q_r.any(None):
+                #     print (delta_q_r)
+                # if delta_q_t.any(None): 
+                #     print (delta_q_t)
+
+                #if(delta_q_r.all(0)):
+                #    new_pose = RigidTransform.from_components(self.trajectory[i].translation + delta_q_t.flatten(), self.trajectory[i].rotation)
+                #else:
+                new_pose = RigidTransform.from_components(self.trajectory[i].translation + delta_q_t.flatten(), Rotation.from_quat(self.avoid_zero(self.trajectory[i].rotation.as_quat()+delta_q_r.flatten())))
                 self.trajectory[i] = new_pose
 
                 # self.trajectory[i].translation -= delta_q_t.flatten()
@@ -296,14 +320,15 @@ class objective_optimizer:
             if it % 25 == 0: # only check every 25 iterations 
                 
                 U = self.obj_func()
+                print("iteration:")
                 print(it)
                 print("Current obj val: ", U)
                 print(self.w1)
                 print(self.w2)
                 print(self.w3)
-                if np.abs(U-U_last) < 1:
-                    return
-                U_last = U
+                # if np.abs(U-U_last) < 15:
+                #     return
+                # U_last = U
 
     def get_euler_trajectory(self):
         euler_trajectory = np.ndarray((len(self.trajectory),6))
@@ -320,3 +345,8 @@ class objective_optimizer:
     def avoid_zero(self, x):
         eps = np.finfo(x.dtype).eps
         return np.maximum(x, eps)
+    
+    def get_finger_points(self, q, offset=0.013):
+        left_gripper  = q[:3, :3] @ np.array([0,  offset, 0]) + q[:3, 3]
+        right_gripper = q[:3, :3] @ np.array([0, -offset, 0]) + q[:3, 3]
+        return left_gripper, right_gripper

@@ -43,14 +43,11 @@ def main():
     arm.set_tcp_offset(TCP_OFFSET)
     arm.set_mode(0)
     arm.set_state(0)
-    arm.move_gohome(wait=True)
+    # arm.move_gohome(wait=True)
     time.sleep(2.5)
 
     try:
         # Get Observation
-        cv_image = zed.image
-
-        
         cv_image = zed.image
 
         # Get Transformation
@@ -98,8 +95,10 @@ def main():
         # trimesh.creation.cylinder
 
         mesh = trimesh.load_mesh("Mug_wo_tags.stl")
-        # mesh.apply_scale(0.02)
+        mesh.apply_scale(1000.0)
         T_mug_robot = np.linalg.inv(t_robot_mug)
+
+        
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh],T_mug_robot)
         # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
