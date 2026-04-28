@@ -183,8 +183,8 @@ def add_trajectory(mug_transform, trajectory):
     pose_geoms = [o3d.geometry.TriangleMesh.create_box(height=0.01, width=0.01, depth=0.01) for _ in range(len(trajectory))]
     
     rotation_matrix = mug_transform[:3, :3]
-    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
-    rotation_matrix = rotation_matrix@rot_90
+    rot_90 = Rotation.from_euler('XYZ',[0,45,0], degrees=True).as_matrix()
+    # rotation_matrix = rotation_matrix@rot_90
     translation_vector = mug_transform[:3, 3]
     if translation_vector[0] > 0.5:
         # change into meters
@@ -197,15 +197,15 @@ def add_trajectory(mug_transform, trajectory):
     for i in range(len(pose_geoms)):
         pose_mat = trajectory[i].as_matrix()
         pose_mat[:3, 3] /= 1000
-        pose_mat = numpy.linalg.inv(mug_transform) @ pose_mat
+        pose_mat = numpy.linalg.inv(pose_mat) @ mug_transform #(mug_transform) @ pose_mat
         # pose_mat[0,3] *= -1
         # x=pose_mat[0][3]
         # pose_mat[0][3] = pose_mat[1][3]
         # pose_mat[1][3] = x
         pose_geoms[i].paint_uniform_color([0,0,0])
-
-        pose_geoms[i] = pose_geoms[i].rotate(rotation_matrix)
         pose_geoms[i] = pose_geoms[i].transform(pose_mat)
+        pose_geoms[i] = pose_geoms[i].rotate(rot_90)
+        
     return pose_geoms
     
 
