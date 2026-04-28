@@ -97,9 +97,10 @@ def main():
         mesh = trimesh.load_mesh("Mug_wo_tags.stl")
         mesh.apply_scale(1000.0)
         T_mug_robot = np.linalg.inv(t_robot_mug)
+        gripper_mesh = trimesh.load_mesh("Gripper G1 3D File (With).STEP")
 
         
-        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh],T_mug_robot)
+        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh, gripper_mesh],T_mug_robot)
         # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
