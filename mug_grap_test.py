@@ -114,7 +114,7 @@ def main():
         plot_trajectory(np.copy(trajectory))
         arm.move_arc_lines(trajectory)
 
-
+        
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=32, display_2d_slices=False, 

@@ -68,9 +68,14 @@ def plot_trajectory(trajectory):
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
     ax.plot(trajectory[:, 0], trajectory[:, 1], trajectory[:, 2])
 
-    ax.set(xticklabels=[],
-        yticklabels=[],
-        zticklabels=[])
+    ax.set_xlabel('X', fontsize=15)
+    ax.set_ylabel('Y', fontsize=15)
+    ax.set_zlabel('Z', fontsize=15)
+
+    # ax.set
+    # ax.set(xticklabels=[],
+    #     yticklabels=[],
+    #     zticklabels=[])
 
     plt.show()
 

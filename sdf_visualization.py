@@ -152,7 +152,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
 
     geom_list = []
     if trajectory is not None:
-        geom_list = add_trajectory(trajectory)
+        geom_list = add_trajectory(mug_transform.copy(), trajectory)
     geom_list.append(mesh_frame)
     # # Visualize the mug and the workspace
     # o3d.visualization.draw_geometries([mug_frame, workspace_box])
@@ -179,16 +179,32 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     geom_list.append(mesh_legacy)
     o3d.visualization.draw_geometries(geom_list)
 
-def add_trajectory(trajectory):
+def add_trajectory(mug_transform, trajectory):
     pose_geoms = [o3d.geometry.TriangleMesh.create_box(height=0.01, width=0.01, depth=0.01) for _ in range(len(trajectory))]
+    
+    rotation_matrix = mug_transform[:3, :3]
+    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    rotation_matrix = rotation_matrix@rot_90
+    translation_vector = mug_transform[:3, 3]
+    if translation_vector[0] > 0.5:
+        # change into meters
+        for i in range(3):
+            translation_vector[i] = translation_vector[i] / 1000
+    
+    # mesh_legacy = mesh_legacy.rotate(rotation_matrix)
+    
+    
     for i in range(len(pose_geoms)):
         pose_mat = trajectory[i].as_matrix()
         pose_mat[:3, 3] /= 1000
+        pose_mat = numpy.linalg.inv(mug_transform) @ pose_mat
         # pose_mat[0,3] *= -1
-        x=pose_mat[0][3]
-        pose_mat[0][3] = pose_mat[1][3]
-        pose_mat[1][3] = x
+        # x=pose_mat[0][3]
+        # pose_mat[0][3] = pose_mat[1][3]
+        # pose_mat[1][3] = x
         pose_geoms[i].paint_uniform_color([0,0,0])
+
+        pose_geoms[i] = pose_geoms[i].rotate(rotation_matrix)
         pose_geoms[i] = pose_geoms[i].transform(pose_mat)
     return pose_geoms
     
