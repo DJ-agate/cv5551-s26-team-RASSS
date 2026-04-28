@@ -20,7 +20,7 @@ class objective_optimizer:
     q_grasps: ndarray of candidate grasps
     obj_meshes: list of object meshes
     '''    
-    def __init__(self, q_endeffector, q_grasps, obj_meshes,t_mug_robot):
+    def __init__(self, q_endeffector, q_grasps, obj_meshes, obj_poses):
         self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
         self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
@@ -35,7 +35,8 @@ class objective_optimizer:
         self.w2 = 60
         self.w3 = 0.8
 
-        self.T_mug_robot = RigidTransform.from_matrix(t_mug_robot)
+        self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
+        
 
         self.traj_smooth_hist = []
 
@@ -92,7 +93,7 @@ class objective_optimizer:
     def f_collision(self, q):
         # q_translation = [q.translation.T]
 
-        p_mug_q = self.T_mug_robot * q
+        
         # p_q_mug = p_mug_q.inv()
         # q_translation = [p_mug_q.translation.T]
         # print(q_translation.shape)
@@ -100,8 +101,9 @@ class objective_optimizer:
         # for mesh in self.obj_meshes:
         #     value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
         #     sdf_sum += value
-        for mesh in self.obj_meshes:
-            q_translation = [p_mug_q.translation.T]  
+        for mesh, t in (self.obj_meshes, self.T_objs_robot):
+            t_mesh_q = t * q
+            q_translation = [t_mesh_q.translation.T]  
             value = trimesh.proximity.signed_distance(mesh, q_translation)[0]
             sdf_sum += value#**2 #min(0.0, value)** 2 # needs to be minimum as distances are negative
         return sdf_sum
@@ -174,8 +176,6 @@ class objective_optimizer:
         sdf_grad_sum = np.zeros((1,3))
 
         
-        p_mug_q = self.T_mug_robot * q_gripper_end
-        
 
         # for mesh in self.obj_meshes:
         #     q_xyz = [p_mug_q.translation.T]  
@@ -196,8 +196,9 @@ class objective_optimizer:
         #             sdf_grad_sum += 2 * value * sdf_grad
         #     else:
         #         sdf_grad_sum += 2 * value
-        for mesh in self.obj_meshes:
-            q_xyz = [p_mug_q.translation.T]   
+        for mesh, t in zip(self.obj_meshes,self.T_objs_robot):
+            T_mesh_q = t * q_gripper_end
+            q_xyz = [T_mesh_q.translation.T]
             value = trimesh.proximity.signed_distance(mesh,q_xyz)[0]
             # print(value)
             closest_point = trimesh.proximity.closest_point(mesh, q_xyz)[0]
