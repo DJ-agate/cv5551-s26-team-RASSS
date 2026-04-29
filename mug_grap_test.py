@@ -64,14 +64,25 @@ def main():
         t_cam_mug = get_mug_from_april(t_cam_tag, mug_tag_id) #todo once complete
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
-        t_cam_tag = None
-        t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
-        
-        t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
-        t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
-        t_robot_tower[2][3] = t_robot_tower[2][3] - (20.5*2)
-        print("t_robot_tower")
-        print(t_robot_tower)
+
+        T_mug_robot = np.linalg.inv(t_robot_mug)
+        T_objects_robot = [np.copy(T_mug_robot)]
+
+        try: 
+            t_cam_tag = None
+            t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
+            
+            if t_cam_tag == None:
+                t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
+                t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
+                t_robot_tower[2][3] = t_robot_tower[2][3] - (20.5*2)
+                print("t_robot_tower")
+                print(t_robot_tower)
+                
+                t_tower_robot = np.linalg.inv(t_robot_tower)
+                T_objects_robot.append(np.copy(t_tower_robot))
+        except:
+            print("no tower")
 
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
@@ -102,9 +113,7 @@ def main():
         
         # trimesh.creation.cylinder
 
-        T_mug_robot = np.linalg.inv(t_robot_mug)
-        t_tower_robot = np.linalg.inv(t_robot_tower)
-        T_objects_robot = [np.copy(T_mug_robot),np.copy(t_tower_robot)]
+        
         
         obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],objects,T_objects_robot)
         # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
