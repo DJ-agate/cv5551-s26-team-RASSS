@@ -22,7 +22,7 @@ TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
 
 CUBE_TAG_FAMILY = 'tag36h11'
 CUBE_TAG_ID = 4
-CUBE_TAG_SIZE = 0.0205
+CUBE_TAG_SIZE = 0.025
 
 robot_ip = '192.168.1.172'
 
@@ -61,33 +61,54 @@ def main():
         cv_image = zed.image
 
     
-        # Get Transformation
+        # # Get Transformation
         t_cam_robot = get_transform_camera_robot(cv_image, camera_intrinsic)
-        # if t_cam_robot is None:
-        #     return
-        t_cam_tag = None
-        t_robot_cube , t_cam_tag, tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot))
-        #print(t_cam_tag)
-        #import get_mug_transform
+        if t_cam_robot is None:
+            return
+        # t_cam_tag = None
+        # t_robot_cube , t_cam_tag, tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot))
+        # #print(t_cam_tag)
+        # #import get_mug_transform
 
-        t_cam_mug = get_mug_from_april(t_cam_tag, tag_id) #todo once complete
+        # t_cam_mug = get_mug_from_april(t_cam_tag, tag_id) #todo once complete
         
-        t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
+        # t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
 
-        t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
-        
-        # Visualize the mug with the SDF
-        # worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
-        # visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
-        #                     workspace_resolution=64, display_2d_slices=False, 
-        #                     select_specific_dist=False, d_star=10, eps=0.2)
+        # t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
+        # print("t_mug_grasp")
+        # print(mug_poses[0])
+        # grasp_pose = t_robot_mug @ mug_poses[0]
+        # print("t_robot_mug_grasp = ", grasp_pose)
 
-        #print("t_robot_mug")
-        #print(t_robot_mug)
+        mesh = trimesh.load_mesh("Mug_wo_tags.stl")
+        mesh.apply_scale(1000.0)
+        t_tower_robot = None
+        tower = None
+        try: 
+            t_cam_tag = None
+            t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
+            
+            
+            t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
+            r = Rotation.from_euler('xyz', [0,180,0], degrees=True) # ORIENTATION CORRECT
+            r = r.as_matrix()
+            
+            t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
+            t_robot_tower[:3,:3] = r
+            t_robot_tower[2][3] = t_robot_tower[2][3] - (25*2)
+            print("t_robot_tower")
+            print(t_robot_tower)
+            
+            t_tower_robot = np.linalg.inv(t_robot_tower)
+            #create and append tower
+            tower = trimesh.creation.capsule(height=90,radius=14)
+        except:
+            print("no tower")
+            pass
         '''
         NEEDS TO BE EDIT SAFE! USE .COPY()
         '''
-        draw_grasp_poses(cv_image, camera_intrinsic, np.copy(mug_poses), t_cam_mug )
+        draw_grasp_poses(cv_image, camera_intrinsic, np.copy(mug_poses), t_cam_tag )
 
         cv2.namedWindow('Verifying Cube Pose', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('Verifying Cube Pose', 1280, 720)
@@ -98,15 +119,10 @@ def main():
 
         ##TODO: IMPORTANT to transform all mug poses before passing them in
         
-        print("t_mug_grasp")
-        print(mug_poses[0])
-        grasp_pose = t_robot_mug @ mug_poses[0]
-        print("t_robot_mug_grasp = ", grasp_pose)
-
-        mesh = trimesh.load_mesh("Mug_wo_tags.stl")
-        mesh.apply_scale(1000.0)
         
-        T_mug_robot = RigidTransform.from_matrix(np.linalg.inv(t_robot_mug))
+        
+        T_mug_robot = RigidTransform.from_matrix(t_tower_robot)
+
         INIT_ARM = arm.get_position()[1]
         INIT_POSE = RigidTransform.from_components(INIT_ARM[:3], Rotation.from_euler('XYZ', INIT_ARM[3:], degrees=True))
 
@@ -115,21 +131,21 @@ def main():
         print("p_mug_q")
         print(p_mug_q)
 
-        T_grasp_pose = RigidTransform.from_matrix(grasp_pose)
+        # T_grasp_pose = RigidTransform.from_matrix(grasp_pose)
 
-        grasp_dist = f_grasp(INIT_POSE, T_grasp_pose)
+        # grasp_dist = f_grasp(INIT_POSE, T_grasp_pose)
 
         p_mug_q = [p_mug_q.translation.T]
 
-        value = trimesh.proximity.signed_distance(mesh, p_mug_q)[0]
-        closest_point = trimesh.proximity.closest_point(mesh, p_mug_q)[0]
+        value = trimesh.proximity.signed_distance(tower, p_mug_q)[0]
+        closest_point = trimesh.proximity.closest_point(tower, p_mug_q)[0]
 
         print("value")
         print(value)
         print("closest_point")
         print(closest_point)
         print("grasp_dist")
-        print(grasp_dist)
+        # print(grasp_dist)
 
         
     finally:

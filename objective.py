@@ -27,12 +27,12 @@ class objective_optimizer:
         self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
 
 
-        self.trajectory = self.init_trajectory(self.q_start, RigidTransform.from_components(self.q_start.translation+[0,200,0],self.q_start.rotation)) # init trjaectory
+        self.trajectory = self.init_trajectory(self.q_start, RigidTransform.from_components(self.q_start.translation+[300,0,0],self.q_start.rotation)) # init trjaectory
         # self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         
         self.obj_meshes = obj_meshes
-        self.w1 = 0#1.2
-        self.w2 = 60
+        self.w1 = 0.1
+        self.w2 = 0#60
         self.w3 = 0.8
 
         self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
@@ -72,7 +72,7 @@ class objective_optimizer:
             new_rot = Rotation.from_quat(trajectory[i-1].rotation.as_quat() + step_rot)
             trajectory[i] = scipy.spatial.transform.RigidTransform.from_components(new_xyz, new_rot)
             # trajectory[i][3:] = 179, 0, 0
-            print(trajectory[i])
+            # print(trajectory[i])
         return trajectory
 
     '''
@@ -170,7 +170,7 @@ class objective_optimizer:
     def f_collision_grad(self, q, eps=1e-6):
         threshold = 50
         # padding = 10
-        q_gripper_end = RigidTransform.from_components(q.translation + [0,0,10], q.rotation)
+        q_gripper_end = RigidTransform.from_components(q.translation + [0,0,-10], q.rotation)
         
         
         sdf_grad_sum = np.zeros((1,3))
@@ -262,7 +262,7 @@ class objective_optimizer:
 
         #do sgd until iteration limit or objective cost below some threshold
         iteration_limit = 750 #2000
-        lr = 1e-2
+        lr = 1e-1 #1e-2
         threshold = 1
         U_last = 0
         for it in range(iteration_limit):
@@ -292,8 +292,8 @@ class objective_optimizer:
                 grasp_grad_t, grasp_grad_r = self.f_grasp_grad(q, self.q_grasp)
                 smooth_grad_t, smooth_grad_r = self.f_smooth_grad(q_next, q, q_last)
 
-                delta_q_t = lr * (self.w1 * grasp_grad_t + self.w2 * self.f_collision_grad(q) - 0.8 * smooth_grad_t)
-                delta_q_r = lr * (self.w1 * grasp_grad_r - 0.8 * smooth_grad_r)
+                delta_q_t = lr * (self.w1 * grasp_grad_t + self.w2 * self.f_collision_grad(q) - self.w3 * smooth_grad_t)
+                delta_q_r = lr * (self.w1 * grasp_grad_r - self.w3 * smooth_grad_r)
 
                 # if delta_q_r.any(None):
                 #     print (delta_q_r)
@@ -340,9 +340,9 @@ class objective_optimizer:
                 print(self.w1)
                 print(self.w2)
                 print(self.w3)
-                # if np.abs(U-U_last) < 15:
+                # if np.abs(U-U_last) < 100 or U-U_last > 500:
                 #     return
-                # U_last = U
+                U_last = U
 
     def get_euler_trajectory(self):
         euler_trajectory = np.ndarray((len(self.trajectory),6))

@@ -38,11 +38,11 @@ def main():
     camera_intrinsic = zed.camera_intrinsic
     objects = []
     #mug to grab mesh
-    mesh = trimesh.load_mesh("Mug_wo_tags.stl")
+    # mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
+    mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
+
     mesh.apply_scale(1000.0)
-    objects.append(mesh)
-    #create and append tower
-    objects.append(trimesh.creation.capsule(height=90,radius=15))
+    
     # objects.append(trimesh.creation.box(extents=[20.5,20.5,4*20.5]))
     # Initialize Lite6 Robot
     arm = XArmAPI(robot_ip)
@@ -64,23 +64,29 @@ def main():
         t_cam_mug = get_mug_from_april(t_cam_tag, mug_tag_id) #todo once complete
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
-
+        
         T_mug_robot = np.linalg.inv(t_robot_mug)
         T_objects_robot = [np.copy(T_mug_robot)]
+        objects.append(mesh)
 
         try: 
             t_cam_tag = None
             t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
             
-            if t_cam_tag == None:
-                t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
-                t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
-                t_robot_tower[2][3] = t_robot_tower[2][3] - (20.5*2)
-                print("t_robot_tower")
-                print(t_robot_tower)
-                
-                t_tower_robot = np.linalg.inv(t_robot_tower)
-                T_objects_robot.append(np.copy(t_tower_robot))
+            
+            t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
+            t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
+            r = R.from_euler('xyz', [0,180,0], degrees=True) # ORIENTATION CORRECT
+            r = r.as_matrix()
+            t_robot_tower[:3,:3] = r
+            t_robot_tower[2][3] = t_robot_tower[2][3] - (25*2)
+            print("t_robot_tower")
+            print(t_robot_tower)
+            
+            t_tower_robot = np.linalg.inv(t_robot_tower)
+            T_objects_robot.append(np.copy(t_tower_robot))
+            #create and append tower
+            objects.append(trimesh.creation.capsule(height=90,radius=15))
         except:
             print("no tower")
 
@@ -109,7 +115,7 @@ def main():
         print("t_mug_grasp")
         print(mug_poses[0])
         grasp_pose = t_robot_mug @ mug_poses[0]
-        print("t_robot_mug_grasp = ", grasp_pose)
+        # print("t_robot_mug_grasp = ", grasp_pose)
         
         # trimesh.creation.cylinder
 
@@ -120,8 +126,8 @@ def main():
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
-        print("trajectory: ")
-        print(trajectory)
+        # print("trajectory: ")
+        # print(trajectory)
 
         
         plot_trajectory(np.copy(trajectory))
