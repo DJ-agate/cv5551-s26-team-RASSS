@@ -28,3 +28,25 @@ def pose_to_matrix(x,y,z,roll,pitch,yaw):
     matrix[:3, :3] = r.as_matrix()
 
     return matrix
+
+
+def skew(vec):
+    x, y, z = vec
+    m = np.array([
+        [0,-z,y],
+        [z,0,-x],
+        [-y,x,0]
+    ])
+    return m
+
+def pose_to_jacobian(q, offset):
+    """
+    Convert pose (xyzrpy) into Jacobian matrix.
+
+    """
+    r = q.rotation.as_matrix()
+    jacobian = np.hstack([
+        np.eye(3),
+        -r @ skew(offset)
+    ])
+    return jacobian
