@@ -28,6 +28,7 @@ robot_ip = '192.168.1.172'
 INIT_POSE = [86.954865, 0.818719, 85.287003, 179.991483, -0.001547, 0.001776]
 
 
+
 def main():
     mug_poses = np.load("poses.pkl", allow_pickle=True)
     print("mug poses pkl:")
@@ -35,7 +36,14 @@ def main():
     # Initialize ZED Camera
     zed = ZedCamera()
     camera_intrinsic = zed.camera_intrinsic
+    objects = []
+    #mug to grab mesh
+    # mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
+    mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
 
+    mesh.apply_scale(1000.0)
+    
+    # objects.append(trimesh.creation.box(extents=[20.5,20.5,4*20.5]))
     # Initialize Lite6 Robot
     arm = XArmAPI(robot_ip)
     arm.connect()
@@ -50,21 +58,38 @@ def main():
         # Get Observation
         cv_image = zed.image
 
-        # Get Transformation
+        # Get Mug transform
         t_cam_robot = get_transform_camera_robot(cv_image, camera_intrinsic)
-        # if t_cam_robot is None:
-        #     return
-        t_cam_tag = None
-        t_robot_cube , t_cam_tag, tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot))
-        #print(t_cam_tag)
-        #import get_mug_transform
-
-        t_cam_mug = get_mug_from_april(t_cam_tag, tag_id) #todo once complete
-        
+        t_robot_cube , t_cam_tag, mug_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [5,9])
+        t_cam_mug = get_mug_from_april(t_cam_tag, mug_tag_id) #todo once complete
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
-
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
         
+        T_mug_robot = np.linalg.inv(t_robot_mug)
+        T_objects_robot = [np.copy(T_mug_robot)]
+        objects.append(mesh)
+
+        try: 
+            t_cam_tag = None
+            t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
+            
+            
+            t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
+            t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
+            r = R.from_euler('xyz', [0,180,0], degrees=True) # ORIENTATION CORRECT
+            r = r.as_matrix()
+            t_robot_tower[:3,:3] = r
+            t_robot_tower[2][3] = t_robot_tower[2][3] - (25*2)
+            print("t_robot_tower")
+            print(t_robot_tower)
+            
+            t_tower_robot = np.linalg.inv(t_robot_tower)
+            T_objects_robot.append(np.copy(t_tower_robot))
+            #create and append tower
+            objects.append(trimesh.creation.capsule(height=90,radius=15))
+        except:
+            print("no tower")
+
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
@@ -82,7 +107,7 @@ def main():
         cv2.resizeWindow('Verifying Cube Pose', 1280, 720)
         cv2.imshow('Verifying Cube Pose', cv_image)
         key = cv2.waitKey(0)
-        if key == ord('k'):
+        if key == ord('q'):
             cv2.destroyAllWindows()
 
         ##TODO: IMPORTANT to transform all mug poses before passing them in
@@ -90,23 +115,19 @@ def main():
         print("t_mug_grasp")
         print(mug_poses[0])
         grasp_pose = t_robot_mug @ mug_poses[0]
-        print("t_robot_mug_grasp = ", grasp_pose)
+        # print("t_robot_mug_grasp = ", grasp_pose)
         
         # trimesh.creation.cylinder
 
-        mesh = trimesh.load_mesh("Mug_wo_tags.stl")
-        mesh.apply_scale(1000.0)
-        T_mug_robot = np.linalg.inv(t_robot_mug)
-        gripper_mesh = trimesh.load_mesh("Gripper G1 3D File (With).STEP")
-
         
-        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],[mesh, gripper_mesh],T_mug_robot)
+        
+        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],objects,T_objects_robot)
         # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
         print(arm.get_position()[1])
-        print("trajectory: ")
-        print(trajectory)
+        # print("trajectory: ")
+        # print(trajectory)
 
         
         plot_trajectory(np.copy(trajectory))
@@ -115,7 +136,7 @@ def main():
         plot_trajectory(np.copy(trajectory))
         arm.move_arc_lines(trajectory)
 
-
+        
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=32, display_2d_slices=False, 

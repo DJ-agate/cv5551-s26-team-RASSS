@@ -56,10 +56,10 @@ def get_mug_from_april(tag_transform, tag_num):
         offset[:3, 3] = [x,y,z]
         mug_pose = tag_transform @ offset
     elif tag_num == 9: # BOTTOM of MUG
-        x = 0.0425
+        x = 0
         y = 0
-        z = 0
-        r = Rotation.from_euler('zyx', [0,0,90], degrees=True) # ORIENTATION CORRECT
+        z = 0.0425
+        r = Rotation.from_euler('zyx', [0,0,0], degrees=True) # ORIENTATION CORRECT
         r = r.as_matrix()
         offset = numpy.eye(4)
         offset[:3,:3] = r
@@ -73,7 +73,7 @@ def get_mug_from_april(tag_transform, tag_num):
 
     return mug_pose
 
-def get_transform_cube(observation, camera_intrinsic, camera_pose):
+def get_transform_cube(observation, camera_intrinsic, camera_pose, tag_range=[4,9]):
     """
     Calculate the transformation matrix for the cube relative to the robot base frame, 
     as well as relative to the camera frame.
@@ -107,7 +107,7 @@ def get_transform_cube(observation, camera_intrinsic, camera_pose):
         observation = cv2.cvtColor(observation, cv2.COLOR_BGRA2GRAY)
 
     tags = detector.detect(observation, estimate_tag_pose=True, tag_size=CUBE_TAG_SIZE, camera_params=[camera_intrinsic[0][0], camera_intrinsic[1][1], camera_intrinsic[0][2], camera_intrinsic[1][2]])
-    tags = [tags[i] for i in range(len(tags)) if tags[i].tag_id > 3]
+    tags = [tags[i] for i in range(len(tags)) if (tags[i].tag_id >= tag_range[0]) and (tags[i].tag_id <= tag_range[1])]
 
     print(f'Number of tags found: {len(tags)}')
     # print(tags[0])
