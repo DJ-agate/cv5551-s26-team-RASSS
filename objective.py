@@ -22,18 +22,23 @@ class objective_optimizer:
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes, obj_poses):
         self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
-        self.q_grasps = [([RigidTransform.from_matrix(grasp) for grasp in q_grasps])]
+        self.q_grasps = [RigidTransform.from_matrix(grasp) for grasp in q_grasps]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
-        self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
+        # self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
 
 
         self.trajectory = self.init_trajectory(self.q_start, RigidTransform.from_components(self.q_start.translation+[300,0,0],self.q_start.rotation)) # init trjaectory
+        self.q_grasp = self.q_grasps[np.argmin([self.f_grasp(self.trajectory[-1], grasp) for grasp in self.q_grasps])]
         # self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         
         self.obj_meshes = obj_meshes
-        self.w1 = 0.1
-        self.w2 = 0#60
-        self.w3 = 0.8
+        self.w1 = 2
+        self.w1_t = 2
+        self.w1_r = 0.2
+        self.w2 = 120
+        self.w3 = 0.6
+        self.w3_t = 1.45#2.4
+        self.w3_r = 1#1.5
 
         self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
         
@@ -51,7 +56,7 @@ class objective_optimizer:
     return:
     trajectory: ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=35):
+    def init_trajectory(self, q_start, q_goal, n=40):
         # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
         # print(q_start.shape)
         # print(q_start)
@@ -168,7 +173,7 @@ class objective_optimizer:
     description: df_collision/dq
     '''
     def f_collision_grad(self, q, eps=1e-6):
-        threshold = 50
+        threshold = 40
         # padding = 10
         q_gripper_end = RigidTransform.from_components(q.translation + [0,0,-10], q.rotation)
         
@@ -261,19 +266,22 @@ class objective_optimizer:
     def optimize_trajectory(self):
 
         #do sgd until iteration limit or objective cost below some threshold
-        iteration_limit = 750 #2000
-        lr = 1e-1 #1e-2
+        iteration_limit = 1000 #2000
+        # lr = 1e-1 #1e-2
         threshold = 1
         U_last = 0
         for it in range(iteration_limit):
-            for i in range(1, len(self.trajectory)-1):
+            lr = (8e-2)*(1-(it/(1.2*iteration_limit))) # decreasing learning rate
+            for i in range(1, len(self.trajectory)):
             # first get partial derivatives for weights
                 q = self.trajectory[i]
                 q_goal_new = None
                 q_last = self.trajectory[i-1]
-               
-                q_next = self.trajectory[i+1]
-             
+
+                if i < (len(self.trajectory)-1):
+                    q_next = self.trajectory[i+1]
+                else:
+                    q_next = self.q_grasp         
                 # delta_w1 = lr * self.f_grasp(q, self.q_grasp)
                 # delta_w2 = lr * self.f_collision(q)
                 # delta_w3 = lr * self.f_smooth(q_next, q, q_last)
@@ -292,8 +300,8 @@ class objective_optimizer:
                 grasp_grad_t, grasp_grad_r = self.f_grasp_grad(q, self.q_grasp)
                 smooth_grad_t, smooth_grad_r = self.f_smooth_grad(q_next, q, q_last)
 
-                delta_q_t = lr * (self.w1 * grasp_grad_t + self.w2 * self.f_collision_grad(q) - self.w3 * smooth_grad_t)
-                delta_q_r = lr * (self.w1 * grasp_grad_r - self.w3 * smooth_grad_r)
+                delta_q_t = lr * (self.w1_t * grasp_grad_t + self.w2 * self.f_collision_grad(q) - self.w3_t * smooth_grad_t)
+                delta_q_r = lr * (self.w1_r * grasp_grad_r - self.w3_r * smooth_grad_r)
 
                 # if delta_q_r.any(None):
                 #     print (delta_q_r)
@@ -334,9 +342,11 @@ class objective_optimizer:
             if it % 25 == 0: # only check every 25 iterations 
                 
                 U = self.obj_func()
+                print("--------------------------")
                 print("iteration:")
                 print(it)
                 print("Current obj val: ", U)
+                print("weights:")
                 print(self.w1)
                 print(self.w2)
                 print(self.w3)
@@ -344,12 +354,19 @@ class objective_optimizer:
                 #     return
                 U_last = U
 
+                # print(self.q_grasp)
+                # print(self.q_grasps)
+                self.q_grasp = self.q_grasps[np.argmin([self.f_grasp(self.trajectory[-1], grasp) for grasp in self.q_grasps])]
+
     def get_euler_trajectory(self):
-        euler_trajectory = np.ndarray((len(self.trajectory),6))
-        for i in range(len(self.trajectory)):
+        viz_trajectory = self.trajectory.copy()
+        viz_trajectory.append(self.q_grasp) # make last point the best grasp pose
+        euler_trajectory = np.ndarray((len(viz_trajectory),6))
+        # self.q_grasp = RigidTransform.from_matrix(self.q_grasps[0])
+        for i in range(len(viz_trajectory)):
             euler_transform = np.ndarray((1,6))
-            euler_transform[0,:3] = np.asarray([self.trajectory[i].translation])
-            euler_transform[0,3:] = np.asarray([self.trajectory[i].rotation.as_euler('XYZ', degrees=True)])
+            euler_transform[0,:3] = np.asarray([viz_trajectory[i].translation])
+            euler_transform[0,3:] = np.asarray([viz_trajectory[i].rotation.as_euler('XYZ', degrees=True)])
             euler_trajectory[i] = euler_transform
         return euler_trajectory
     
