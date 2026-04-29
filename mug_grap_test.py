@@ -42,7 +42,8 @@ def main():
     mesh.apply_scale(1000.0)
     objects.append(mesh)
     #create and append tower
-    objects.append(trimesh.creation.box(extents=[20.5,20.5,4*20.5]))
+    objects.append(trimesh.creation.capsule(height=90,radius=15))
+    # objects.append(trimesh.creation.box(extents=[20.5,20.5,4*20.5]))
     # Initialize Lite6 Robot
     arm = XArmAPI(robot_ip)
     arm.connect()
@@ -59,18 +60,18 @@ def main():
 
         # Get Mug transform
         t_cam_robot = get_transform_camera_robot(cv_image, camera_intrinsic)
-        t_cam_tag = None
         t_robot_cube , t_cam_tag, mug_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [5,9])
         t_cam_mug = get_mug_from_april(t_cam_tag, mug_tag_id) #todo once complete
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
-        
         t_cam_tag = None
         t_robot_cube , t_cam_tag, tower_tag_id = get_transform_cube(cv_image, camera_intrinsic, np.linalg.inv(t_cam_robot), [4,4])
-
+        
         t_robot_tower = np.linalg.inv(t_cam_robot) @ t_cam_tag
         t_robot_tower[:3, 3] = t_robot_tower[:3, 3] *1000
         t_robot_tower[2][3] = t_robot_tower[2][3] - (20.5*2)
+        print("t_robot_tower")
+        print(t_robot_tower)
 
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
@@ -89,7 +90,7 @@ def main():
         cv2.resizeWindow('Verifying Cube Pose', 1280, 720)
         cv2.imshow('Verifying Cube Pose', cv_image)
         key = cv2.waitKey(0)
-        if key == ord('k'):
+        if key == ord('q'):
             cv2.destroyAllWindows()
 
         ##TODO: IMPORTANT to transform all mug poses before passing them in

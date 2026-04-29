@@ -101,7 +101,7 @@ class objective_optimizer:
         # for mesh in self.obj_meshes:
         #     value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
         #     sdf_sum += value
-        for mesh, t in (self.obj_meshes, self.T_objs_robot):
+        for mesh, t in zip(self.obj_meshes, self.T_objs_robot):
             t_mesh_q = t * q
             q_translation = [t_mesh_q.translation.T]  
             value = trimesh.proximity.signed_distance(mesh, q_translation)[0]
