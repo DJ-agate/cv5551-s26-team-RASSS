@@ -16,7 +16,7 @@ from sdf_visualization import visualize_workspace
 
 #for robot frame
 TAG_SIZE = 0.08
-GRIPPER_LENGTH = 0.069 * 1000
+GRIPPER_LENGTH = 0.1 *1000 #0.069 * 1000
 TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
 
 
@@ -39,6 +39,7 @@ def main():
     objects = []
     #mug to grab mesh
     # mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
+    #mesh = o3d.io.read_triangle_mesh("SOLID_mug_wo_tags.stl")
     mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
 
     mesh.apply_scale(1000.0)
@@ -86,7 +87,8 @@ def main():
             t_tower_robot = np.linalg.inv(t_robot_tower)
             T_objects_robot.append(np.copy(t_tower_robot))
             #create and append tower
-            objects.append(trimesh.creation.capsule(height=90,radius=15))
+            #objects.append(o3d.geometry.create_mesh_cylinder(radius=15, height=90, resolution=10))
+            objects.append(trimesh.creation.capsule(height=200,radius=15))
         except:
             print("no tower")
 
@@ -117,13 +119,14 @@ def main():
         print("t_mug_grasp")
         print(mug_poses[0])
         grasp_pose = t_robot_mug @ mug_poses[0]
+        T_robot_mug_poses = [t_robot_mug @ t_pose for t_pose in mug_poses]
         # print("t_robot_mug_grasp = ", grasp_pose)
         
         # trimesh.creation.cylinder
 
         
         
-        obj_opt = objective_optimizer(arm.get_position()[1],[grasp_pose],objects,T_objects_robot)
+        obj_opt = objective_optimizer(arm.get_position()[1],T_robot_mug_poses,objects,T_objects_robot)
         # obj_opt = objective_optimizer(INIT_POSE,[grasp_pose],[mesh],T_mug_robot)
         trajectory= obj_opt.get_euler_trajectory()
         print("arm initial:")
