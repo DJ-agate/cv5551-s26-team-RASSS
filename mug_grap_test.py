@@ -101,6 +101,8 @@ def main():
         '''
         NEEDS TO BE EDIT SAFE! USE .COPY()
         '''
+        #for testing
+        # mug_poses = np.asarray([mug_poses[0]])
         draw_grasp_poses(cv_image, camera_intrinsic, np.copy(mug_poses), t_cam_mug )
 
         cv2.namedWindow('Verifying Cube Pose', cv2.WINDOW_NORMAL)
