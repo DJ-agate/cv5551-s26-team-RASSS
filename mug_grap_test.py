@@ -150,7 +150,7 @@ def main():
         obj_opt.optimize_trajectory()
         trajectory= obj_opt.get_euler_trajectory()
         plot_trajectory(np.copy(trajectory))
-        arm.move_arc_lines(trajectory)
+        arm.move_arc_lines(trajectory,wait=True)
 
         
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
@@ -158,10 +158,13 @@ def main():
                             workspace_resolution=32, display_2d_slices=False, 
                             select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
         
-        
+        time.sleep(2.5)
         grasp_grip_length = 0.069 * 1000
         new_tcp_offset = [0,0,grasp_grip_length,0,0,0]
         arm.set_tcp_offset(new_tcp_offset)
+        arm.set_mode(0)
+        arm.set_state(0)
+        arm.open_lite6_gripper()
 
         grasp_pose = trajectory[-1]
         print(grasp_pose)
@@ -175,6 +178,11 @@ def main():
             
         time.sleep(0.5)
         arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
+        arm.close_lite6_gripper()
+        time.sleep(1.5)
+        arm.set_position(x,y,z+50,roll,pitch,yaw,is_radian=None,wait=True)
+        time.sleep(5.0)
+        arm.open_lite6_gripper()
 
         # Grasp
         # x = grasp_pose[0][3]
@@ -209,7 +217,6 @@ def main():
         #     time.sleep(1)
 
         #arm.open_lite6_gripper()
-        time.sleep(0.5)
         # arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True, speed=200)
 
 
