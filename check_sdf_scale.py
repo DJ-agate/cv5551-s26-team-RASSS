@@ -101,7 +101,7 @@ def main():
             
             t_tower_robot = np.linalg.inv(t_robot_tower)
             #create and append tower
-            tower = trimesh.creation.capsule(height=90,radius=14)
+            tower = trimesh.creation.capsule(height=90,radius=15)
         except:
             print("no tower")
             pass
