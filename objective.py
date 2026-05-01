@@ -39,7 +39,7 @@ class objective_optimizer:
         self.w1_r = 0.0
         self.w2 = 120
         self.w3 = 0.6
-        self.w3_t = 1.45#2.4
+        self.w3_t = 3.0 #1.45#2.4
         self.w3_r = 1#1.5
 
         self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
@@ -199,7 +199,7 @@ class objective_optimizer:
     '''
     def f_collision_grad(self, q, eps=1e-6):
         mesh_threshold = 40
-        table_threshold = 80
+        table_threshold = 70
         # padding = 10
         q_gripper_end = RigidTransform.from_components(q.translation + [0,0,-15], q.rotation)
         
