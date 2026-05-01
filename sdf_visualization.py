@@ -110,9 +110,9 @@ Parameters:
 Returns:
     (none)
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None, obstacle=False):
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None, obstacle=False, obst_transform=None):
     rotation_matrix = mug_transform[:3, :3]
-    # rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
     # rotation_matrix = rotation_matrix@rot_90
     rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('XYZ', degrees=True)
     translation_vector = mug_transform[:3, 3]
@@ -135,6 +135,30 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
 
     points = compute_3d_points(workspace_bound, workspace_resolution)
     
+    geom_list = []
+    # add the obstacle if there is one
+    if obstacle==True:
+        print("Adding obstacle to visual)")
+        obst_transform[:3,3] = obst_transform[:3,3]/1000
+        obst_transform = numpy.linalg.inv(mug_transform)@obst_transform
+        obst_t = obst_transform[:3,3]
+        obst_rot = obst_transform[:3,:3]
+        obst_rot = obst_rot@rot_90
+        # if obst_t[0] > 0.5:q
+        #     # change into meters
+        #     for i in range(3):
+        #         obst_t[i] = obst_t[i] / 1000
+        obst_xyz = Rotation.from_matrix(obst_rot).as_euler('XYZ', degrees=True)
+
+        obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
+        obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
+        obstacle_mesh.compute_vertex_normals()
+        # obstacle_legacy.scale(100.0, [0,0,0])
+        # obstacle_mesh.rotate(obst_rot)
+
+        obstacle_mesh.translate(obst_t)
+        _ = scene.add_triangles(obstacle_legacy)
+        geom_list.append(obstacle_mesh)
 
     sdf = query_sdf(scene, points)  ### SDF/sDF
     sdf = sdf.reshape(workspace_resolution, workspace_resolution, workspace_resolution)
@@ -150,7 +174,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
 
     mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.04, origin=(0,0.4,0))
 
-    geom_list = []
+
     if trajectory is not None:
         geom_list = add_trajectory(mug_transform.copy(), trajectory)
     geom_list.append(mesh_frame)
@@ -179,11 +203,24 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     geom_list.append(mesh_legacy)
 
     # add the obstacle if there is one
-    if obstacle is True:
+    if obstacle==True:
+        print("Adding obstacle to visual)")
+        obst_t = obst_transform[:3,3]
+        obst_rot = obst_transform[:3,:3]
+        if obst_t[0] > 0.5:
+            # change into meters
+            for i in range(3):
+                obst_t[i] = obst_t[i] / 1000
+        obst_xyz = Rotation.from_matrix(obst_rot).as_euler('XYZ', degrees=True)
+
         obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
         obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
-        obstacle_legacy.compute_vertex_normals()
-        geom_list.append(obstacle_legacy)
+        obstacle_mesh.compute_vertex_normals()
+        # obstacle_legacy.scale(1000.0, [0,0,0])
+        obstacle_mesh.rotate(obst_rot)
+        obstacle_mesh.translate(obst_t)
+        _ = scene.add_triangles(obstacle_legacy)
+        geom_list.append(obstacle_mesh)
 
     o3d.visualization.draw_geometries(geom_list)
 

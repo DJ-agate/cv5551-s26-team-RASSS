@@ -109,7 +109,7 @@ def main():
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=64, display_2d_slices=False, 
-                            select_specific_dist=False, d_star=10, eps=0.2)
+                            select_specific_dist=False, d_star=10, eps=0.2, obstacle=True, obst_transform=np.copy(t_robot_tower))
 
         #print("t_robot_mug")
         #print(t_robot_mug)
@@ -158,7 +158,7 @@ def main():
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=32, display_2d_slices=False, 
-                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
+                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy(), obstacle=True)
         
         time.sleep(0.5)
         grasp_grip_length = 0.069 * 1000
