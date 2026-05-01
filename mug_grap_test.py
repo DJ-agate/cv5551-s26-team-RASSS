@@ -14,6 +14,8 @@ from objective import objective_optimizer
 import trimesh
 from sdf_visualization import visualize_workspace
 
+import open3d as o3d
+
 #for robot frame
 TAG_SIZE = 0.08
 GRIPPER_LENGTH = 0.1 *1000 #0.069 * 1000
@@ -40,9 +42,12 @@ def main():
     #mug to grab mesh
     # mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
     mesh = o3d.io.read_triangle_mesh("SOLID_mug_wo_tags.stl")
+    mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
     # mesh = trimesh.load_mesh("SOLID_mug_wo_tags.stl")
 
-    mesh.apply_scale(1000.0)
+    mesh.scale(1000, [0,0,0])
+    #trimesh
+    # mesh.apply_scale(1000.0)
     
     # objects.append(trimesh.creation.box(extents=[20.5,20.5,4*20.5]))
     # Initialize Lite6 Robot
@@ -66,8 +71,9 @@ def main():
         t_robot_mug = np.linalg.inv(t_cam_robot) @ t_cam_mug
         t_robot_mug[:3, 3] = t_robot_mug[:3, 3] *1000
         
-        T_mug_robot = np.linalg.inv(t_robot_mug)
-        T_objects_robot = [np.copy(T_mug_robot)]
+        # T_mug_robot = np.linalg.inv(t_robot_mug)
+        # T_objects_robot = [np.copy(T_mug_robot)]
+        T_objects_robot = [np.copy(t_robot_mug)]
         objects.append(mesh)
 
         try: 
@@ -84,13 +90,18 @@ def main():
             print("t_robot_tower")
             print(t_robot_tower)
             
-            t_tower_robot = np.linalg.inv(t_robot_tower)
-            T_objects_robot.append(np.copy(t_tower_robot))
+            # t_tower_robot = np.linalg.inv(t_robot_tower)
+            # T_objects_robot.append(np.copy(t_tower_robot))
+            T_objects_robot.append(np.copy(t_robot_tower))
             #create and append tower
-            objects.append(o3d.geometry.create_mesh_cylinder(radius=15, height=200, resolution=10))
-            # objects.append(trimesh.creation.capsule(height=200,radius=15))
-        except:
+            objects.append(o3d.t.geometry.TriangleMesh.from_legacy(o3d.geometry.TriangleMesh.create_cylinder(radius=15, height=110, resolution=10)))
+            
+            # objects.append(o3d.t.geometry.TriangleMesh.from_legacy(o3d.geometry.TriangleMesh.create_box(width=100, height=10.0, depth=75.0)))
+            # objects.append(trimesh.creation.capsule(height=150,radius=15))
+        except Exception as e:
             print("no tower")
+            print(e)
+        print(len(objects))
 
         # Visualize the mug with the SDF
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
@@ -146,8 +157,24 @@ def main():
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=32, display_2d_slices=False, 
                             select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
-        #print(obj_opt.trajectory)
+        
+        
+        grasp_grip_length = 0.069 * 1000
+        new_tcp_offset = [0,0,grasp_grip_length,0,0,0]
+        arm.set_tcp_offset(new_tcp_offset)
 
+        grasp_pose = trajectory[-1]
+        print(grasp_pose)
+        x = grasp_pose[0]
+        y = grasp_pose[1]
+        z = grasp_pose[2]
+        
+        roll = grasp_pose[3]
+        pitch = grasp_pose[4]
+        yaw = grasp_pose[5]
+            
+        time.sleep(0.5)
+        arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
 
         # Grasp
         # x = grasp_pose[0][3]
