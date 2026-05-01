@@ -87,8 +87,8 @@ def main():
             t_tower_robot = np.linalg.inv(t_robot_tower)
             T_objects_robot.append(np.copy(t_tower_robot))
             #create and append tower
-            objects.append(o3d.geometry.create_mesh_cylinder(radius=15, height=200, resolution=10))
-            # objects.append(trimesh.creation.capsule(height=200,radius=15))
+            objects.append(o3d.geometry.create_mesh_cylinder(radius=15, height=150, resolution=10))
+            # objects.append(trimesh.creation.capsule(height=150,radius=15))
         except:
             print("no tower")
 
