@@ -110,10 +110,10 @@ Parameters:
 Returns:
     (none)
 """
-def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None):
+def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None, obstacle=False):
     rotation_matrix = mug_transform[:3, :3]
-    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
-    rotation_matrix = rotation_matrix@rot_90
+    # rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    # rotation_matrix = rotation_matrix@rot_90
     rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('XYZ', degrees=True)
     translation_vector = mug_transform[:3, 3]
     if translation_vector[0] > 0.5:
@@ -121,7 +121,7 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
         for i in range(3):
             translation_vector[i] = translation_vector[i] / 1000
     
-    mesh_legacy = o3d.io.read_triangle_mesh("Mug_wo_tags.stl")
+    mesh_legacy = o3d.io.read_triangle_mesh("SOLID_mug_wo_tags.stl")
     # Update to new format
     mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh_legacy)
     mesh.compute_vertex_normals()
@@ -177,6 +177,14 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
         # Draw the 3d Mesh
     geom_list.append(pcd)
     geom_list.append(mesh_legacy)
+
+    # add the obstacle if there is one
+    if obstacle is True:
+        obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
+        obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
+        obstacle_legacy.compute_vertex_normals()
+        geom_list.append(obstacle_legacy)
+
     o3d.visualization.draw_geometries(geom_list)
 
 def add_trajectory(mug_transform, trajectory):
