@@ -6,11 +6,13 @@ import open3d as o3d
 import scipy
 # import quaternion as quat
 
+from matplotlib import pyplot as plt
+
 from scipy.spatial.transform import RigidTransform, Rotation, Slerp
 from copy import copy
 from utils.math_utils import matrix_to_pose
 
-from open3d.t.geometry import RayCastingScene
+from open3d.t.geometry import RaycastingScene
 
 '''
 Description: Optimizes a trajectory
@@ -24,7 +26,7 @@ class objective_optimizer:
     obj_meshes: list of object meshes
     '''    
     def __init__(self, q_endeffector, q_grasps, obj_meshes, obj_poses):
-        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('XYZ', q_endeffector[3:], degrees=True))
+        self.q_start = RigidTransform.from_components(q_endeffector[:3], Rotation.from_euler('xyz', q_endeffector[3:], degrees=True))
         self.q_grasps = [RigidTransform.from_matrix(grasp) for grasp in q_grasps]
         #self.q_grasp = np.argmin(np.linalg.norm(q_grasps-q_endeffector)) #closest goal pose
         # self.q_grasp = RigidTransform.from_matrix(q_grasps[0])
@@ -41,7 +43,7 @@ class objective_optimizer:
         self.w1_r = 0.0
         self.w2 = 120
         self.w3 = 0.6
-        self.w3_t = 3.0 #1.45#2.4
+        self.w3_t = 2.0 #1.45#2.4
         self.w3_r = 1#1.5
 
         self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
@@ -50,13 +52,29 @@ class objective_optimizer:
         # self.proximity_queries = [trimesh.proximity.ProximityQuery(mesh) for mesh in obj_meshes]
 
         #transform each mesh by its pose, then add to scene
-        self.transformed_objs = []
         self.scene = RaycastingScene()
         
         for i in range(len(obj_meshes)):
-            mesh = obj_meshes[i].transform(self.T_objs_robot[i])
+            mesh = obj_meshes[i].transform(self.T_objs_robot[i].as_matrix())
             _ = self.scene.add_triangles(mesh)
+        rays = o3d.t.geometry.RaycastingScene.create_rays_pinhole(
+            fov_deg=90,
+            # center=[3, 0, 20],
+            center=self.T_objs_robot[0].translation,
+            eye=self.T_objs_robot[0].translation+[400, 0, 1],
+            up=[0, 0, -1],
+            width_px=1920,
+            height_px=1080,
+        )
+        ans = self.scene.cast_rays(rays)
 
+        plt.clf()
+        # plt.imshow(ans['t_hit'].numpy())
+        plt.imshow(np.abs(ans['primitive_normals'].numpy()))
+        plt.show()
+        # plt.clf()
+# We can directly pass the rays tensor to the cast_rays function.
+        
         # self.obj_scenes = []
         # for mesh in obj_meshes:
         #     scene = o3d.t.geometry.RayCastingscene
@@ -74,7 +92,7 @@ class objective_optimizer:
     return:
     trajectory: ndarray
     '''
-    def init_trajectory(self, q_start, q_goal, n=40):
+    def init_trajectory(self, q_start, q_goal, n=30):
         # assert q_start.shape[1]==6 and q_goal.shape[1]==6, "inputs aren't 6dof vectors. q_start: " + str(q_start.shape) + " q_goal: " + str(q_goal.shape)
         # print(q_start.shape)
         # print(q_start)
@@ -140,7 +158,9 @@ class objective_optimizer:
         #     q_translation = [t_mesh_q.translation.T]
         #     value = mesh.signed_distance(q_translation)[0]
         #     sdf_sum += value #**2 #min(0.0, value)** 2 # needs to be minimum as distances are negative
-        sdf_sum = min(0, -self.scene.compute_signed_distance(q.translation.T))
+        pt = o3d.core.Tensor([q.translation.T],dtype=o3d.core.Dtype.Float32)
+
+        sdf_sum = min(0, -self.scene.compute_signed_distance(pt))
         return sdf_sum
     
     '''
@@ -206,7 +226,7 @@ class objective_optimizer:
     '''
     def f_collision_grad(self, q, eps=1e-6):
         mesh_threshold = 40
-        table_threshold = 70
+        table_threshold = 40
         # padding = 10
         q_gripper_end = RigidTransform.from_components(q.translation + [0,0,-15], q.rotation)
         
@@ -246,11 +266,12 @@ class objective_optimizer:
         
         #scene not including table
         q_xyz = q.translation.T
-        value = -self.scene.compute_signed_distance(q_xyz)
-        closest_point = self.scene.compute_closest_point(q_xyz).points
+        pt = o3d.core.Tensor([q_xyz],dtype=o3d.core.Dtype.Float32)
+        value = self.scene.compute_signed_distance(pt)
+        closest_point = self.scene.compute_closest_points(pt)['points'].numpy()[0]
         dist_grad = (closest_point-q_xyz)/self.avoid_zero(np.sqrt((closest_point-q_xyz)**2))
-        if value > -mesh_threshold:
-            sdf_grad_sum += dist_grad
+        if value < mesh_threshold:
+            sdf_grad_sum -= dist_grad
 
         #table collision avoidance
         value = q.translation[2]
@@ -307,9 +328,8 @@ class objective_optimizer:
 
     '''
     def optimize_trajectory(self):
-
         #do sgd until iteration limit or objective cost below some threshold
-        iteration_limit = 1000 #2000
+        iteration_limit = 500 #2000
         # lr = 1e-1 #1e-2
         threshold = 1
         U_last = 0
