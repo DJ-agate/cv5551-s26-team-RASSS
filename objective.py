@@ -10,6 +10,8 @@ from scipy.spatial.transform import RigidTransform, Rotation, Slerp
 from copy import copy
 from utils.math_utils import matrix_to_pose
 
+from open3d.t.geometry import RayCastingScene
+
 '''
 Description: Optimizes a trajectory
 
@@ -45,12 +47,16 @@ class objective_optimizer:
         self.T_objs_robot = [RigidTransform.from_matrix(t) for t in obj_poses]
         
 
-        self.proximity_queries = [trimesh.proximity.ProximityQuery(mesh) for mesh in obj_meshes]
+        # self.proximity_queries = [trimesh.proximity.ProximityQuery(mesh) for mesh in obj_meshes]
 
         #transform each mesh by its pose, then add to scene
         self.transformed_objs = []
-        # self.scene = o3d.t.geometry.RaycastingScene()
+        self.scene = RaycastingScene()
         
+        for i in range(len(obj_meshes)):
+            mesh = obj_meshes[i].transform(self.T_objs_robot[i])
+            _ = self.scene.add_triangles(mesh)
+
         # self.obj_scenes = []
         # for mesh in obj_meshes:
         #     scene = o3d.t.geometry.RayCastingscene
@@ -129,11 +135,12 @@ class objective_optimizer:
         # for mesh in self.obj_meshes:
         #     value = trimesh.proximity.signed_distance(mesh,q_translation)[0]
         #     sdf_sum += value
-        for mesh, t in zip(self.proximity_queries, self.T_objs_robot):
-            t_mesh_q = t * q
-            q_translation = [t_mesh_q.translation.T]
-            value = mesh.signed_distance(q_translation)[0]
-            sdf_sum += value #**2 #min(0.0, value)** 2 # needs to be minimum as distances are negative
+        # for mesh, t in zip(self.proximity_queries, self.T_objs_robot):
+        #     t_mesh_q = t * q
+        #     q_translation = [t_mesh_q.translation.T]
+        #     value = mesh.signed_distance(q_translation)[0]
+        #     sdf_sum += value #**2 #min(0.0, value)** 2 # needs to be minimum as distances are negative
+        sdf_sum = min(0, -self.scene.compute_signed_distance(q.translation.T))
         return sdf_sum
     
     '''
@@ -227,16 +234,24 @@ class objective_optimizer:
         #             sdf_grad_sum += 2 * value * sdf_grad
         #     else:
         #         sdf_grad_sum += 2 * value
-        for mesh, t in zip(self.proximity_queries,self.T_objs_robot):
-            T_mesh_q = t * q_gripper_end
-            q_xyz = [T_mesh_q.translation.T]
-            value = mesh.signed_distance(q_xyz)[0]
-            # print(value)
-            closest_point = mesh.on_surface(q_xyz)[0]
-            dist_grad = (closest_point-q_xyz)/self.avoid_zero(np.sqrt((closest_point-q_xyz)**2))
-            if value > -mesh_threshold:
-                sdf_grad_sum += dist_grad
+        # for mesh, t in zip(self.proximity_queries,self.T_objs_robot):
+        #     T_mesh_q = t * q_gripper_end
+        #     q_xyz = [T_mesh_q.translation.T]
+        #     value = mesh.signed_distance(q_xyz)[0]
+        #     # print(value)
+        #     closest_point = mesh.on_surface(q_xyz)[0]
+        #     dist_grad = (closest_point-q_xyz)/self.avoid_zero(np.sqrt((closest_point-q_xyz)**2))
+        #     if value > -mesh_threshold:
+        #         sdf_grad_sum += dist_grad
         
+        #scene not including table
+        q_xyz = q.translation.T
+        value = -self.scene.compute_signed_distance(q_xyz)
+        closest_point = self.scene.compute_closest_point(q_xyz).points
+        dist_grad = (closest_point-q_xyz)/self.avoid_zero(np.sqrt((closest_point-q_xyz)**2))
+        if value > -mesh_threshold:
+            sdf_grad_sum += dist_grad
+
         #table collision avoidance
         value = q.translation[2]
         closest_point = q.translation
