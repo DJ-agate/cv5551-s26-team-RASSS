@@ -19,7 +19,7 @@ import open3d as o3d
 #for robot frame
 TAG_SIZE = 0.08
 GRIPPER_LENGTH = 0.1 *1000 #0.069 * 1000
-TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
+TCP_OFFSET = [0,-5,GRIPPER_LENGTH,0,0,0]
 
 
 CUBE_TAG_FAMILY = 'tag36h11'
@@ -27,7 +27,7 @@ CUBE_TAG_ID = 4
 CUBE_TAG_SIZE = 0.0205
 
 robot_ip = '192.168.1.172'
-INIT_POSE = [86.954865, 0.818719, 85.287003, 179.991483, -0.001547, 0.001776]
+# INIT_POSE = [86.954865, 0.818719, 85.287003, 179.991483, -0.001547, 0.001776]
 
 
 
@@ -58,6 +58,8 @@ def main():
     arm.set_mode(0)
     arm.set_state(0)
     # arm.move_gohome(wait=True)
+    arm.set_position(245,100,35,180,0,0,is_radian=None,wait=True) #side tests
+    # arm.set_position(100,0,45,180,0,0,is_radian=None,wait=True) # center workspace tests
     time.sleep(2.5)
 
     try:
@@ -158,9 +160,9 @@ def main():
                             workspace_resolution=32, display_2d_slices=False, 
                             select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy())
         
-        time.sleep(2.5)
+        time.sleep(0.5)
         grasp_grip_length = 0.069 * 1000
-        new_tcp_offset = [0,0,grasp_grip_length,0,0,0]
+        new_tcp_offset = [0,-5,grasp_grip_length,0,0,0]
         arm.set_tcp_offset(new_tcp_offset)
         arm.set_mode(0)
         arm.set_state(0)
@@ -175,14 +177,16 @@ def main():
         roll = grasp_pose[3]
         pitch = grasp_pose[4]
         yaw = grasp_pose[5]
-            
-        time.sleep(0.5)
+        time.sleep(1.0)
         arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
+        time.sleep(2.0)
         arm.close_lite6_gripper()
-        time.sleep(1.5)
+        time.sleep(1.0)
         arm.set_position(x,y,z+50,roll,pitch,yaw,is_radian=None,wait=True)
-        time.sleep(5.0)
+        time.sleep(2.0)
         arm.open_lite6_gripper()
+        time.sleep(2.0)
+        arm.stop_lite6_gripper()
 
         # Grasp
         # x = grasp_pose[0][3]
