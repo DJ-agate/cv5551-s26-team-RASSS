@@ -70,6 +70,7 @@ class objective_optimizer:
 
         plt.clf()
         # plt.imshow(ans['t_hit'].numpy())
+        plt.title('Raycasting Scene')
         plt.imshow(np.abs(ans['primitive_normals'].numpy()))
         plt.show()
         # plt.clf()
