@@ -19,7 +19,7 @@ import open3d as o3d
 #for robot frame
 TAG_SIZE = 0.08
 GRIPPER_LENGTH = 0.1 *1000 #0.069 * 1000
-TCP_OFFSET = [0,-5,GRIPPER_LENGTH,0,0,0]
+TCP_OFFSET = [0,0,GRIPPER_LENGTH,0,0,0]
 
 
 CUBE_TAG_FAMILY = 'tag36h11'
@@ -158,11 +158,11 @@ def main():
         worspace_boundary = [[0, 0.380], [-0.400, 0.400], [0, 0.500]]
         visualize_workspace(np.copy(t_robot_mug), workspace_bound=worspace_boundary, 
                             workspace_resolution=32, display_2d_slices=False, 
-                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy(), obstacle=True)
+                            select_specific_dist=False, d_star=10, eps=0.2, trajectory=obj_opt.trajectory.copy(), obstacle=True, obst_transform=np.copy(t_robot_tower))
         
         time.sleep(0.5)
         grasp_grip_length = 0.069 * 1000
-        new_tcp_offset = [0,-5,grasp_grip_length,0,0,0]
+        new_tcp_offset = [0,0,grasp_grip_length,0,0,0]
         arm.set_tcp_offset(new_tcp_offset)
         arm.set_mode(0)
         arm.set_state(0)
@@ -179,13 +179,13 @@ def main():
         yaw = grasp_pose[5]
         time.sleep(1.0)
         arm.set_position(x,y,z,roll,pitch,yaw,is_radian=None,wait=True)
-        time.sleep(2.0)
+        time.sleep(1.0)
         arm.close_lite6_gripper()
         time.sleep(1.0)
         arm.set_position(x,y,z+50,roll,pitch,yaw,is_radian=None,wait=True)
-        time.sleep(2.0)
+        time.sleep(1.0)
         arm.open_lite6_gripper()
-        time.sleep(2.0)
+        time.sleep(1.0)
         arm.stop_lite6_gripper()
 
         # Grasp

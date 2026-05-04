@@ -34,7 +34,7 @@ class objective_optimizer:
         # t_robot_EE
         self.trajectory = self.init_trajectory(self.q_start, RigidTransform.from_components(self.q_start.translation+[300,0,0],self.q_start.rotation)) # init trjaectory
         # t_robot_
-        self.q_grasp = self.q_grasps[np.argmin([self.f_grasp(self.trajectory[-1], grasp) for grasp in self.q_grasps])]
+        self.q_grasp = self.q_grasps[np.argmin([self.f_grasp(self.q_start, grasp) for grasp in self.q_grasps])]
         # self.trajectory = self.init_trajectory(self.q_start, self.q_grasp) # init trjaectory
         
         self.obj_meshes = obj_meshes
@@ -333,7 +333,7 @@ class objective_optimizer:
         # lr = 1e-1 #1e-2
         threshold = 1
         U_last = 0
-        for it in range(iteration_limit):
+        for it in range(1, iteration_limit+1):
             lr = (8e-2)*(1-(it/(1.2*iteration_limit))) # decreasing learning rate
             for i in range(1, len(self.trajectory)):
             # first get partial derivatives for weights
@@ -407,14 +407,16 @@ class objective_optimizer:
             if it % 25 == 0: # only check every 25 iterations 
                 
                 U = self.obj_func()
-                print("--------------------------")
+                print("------------------------------------")
                 print("iteration:")
                 print(it)
-                print("Current obj val: ", U)
+                print("Current obj val: ", U[0])
                 print("weights:")
                 print(self.w1)
                 print(self.w2)
                 print(self.w3)
+                print("------------------------------------")
+
                 # if np.abs(U-U_last) < 100 or U-U_last > 500:
                 #     return
                 U_last = U
