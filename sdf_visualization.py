@@ -112,9 +112,9 @@ Returns:
 """
 def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolution=64, display_2d_slices=True, select_specific_dist=False, d_star=0.01, eps=0.002, trajectory=None, obstacle=False, obst_transform=None):
     rotation_matrix = mug_transform[:3, :3]
-    rot_90 = Rotation.from_euler('XYZ',[0,0,-90], degrees=True).as_matrix()
+    rot_90 = Rotation.from_euler('xyz',[0,0,90], degrees=True).as_matrix()
     # rotation_matrix = rotation_matrix@rot_90
-    rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('XYZ', degrees=True)
+    rotation_xyz = Rotation.from_matrix(rotation_matrix).as_euler('xyz', degrees=True)
     translation_vector = mug_transform[:3, 3]
     if translation_vector[0] > 0.5:
         # change into meters
@@ -139,24 +139,27 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     # add the obstacle if there is one
     if obstacle==True:
         print("Adding obstacle to visual)")
-        obst_transform[:3,3] = obst_transform[:3,3]/1000
-        obst_transform = numpy.linalg.inv(mug_transform)@obst_transform
-        obst_t = obst_transform[:3,3]
-        obst_rot = obst_transform[:3,:3]
-        obst_rot = obst_rot@rot_90
-        # if obst_t[0] > 0.5:q
-        #     # change into meters
-        #     for i in range(3):
-        #         obst_t[i] = obst_t[i] / 1000
-        obst_xyz = Rotation.from_matrix(obst_rot).as_euler('XYZ', degrees=True)
+        obst_transform_1 = obst_transform.copy()
+        obst_transform_1[:3,3] = obst_transform[:3,3]/1000
+        # obst_translation = obst_transform[:3,3]/1000
+        obst_transform_1 = numpy.linalg.inv(mug_transform.copy())@obst_transform_1.copy()
+        obst_t = obst_transform_1[:3,3]
+        obst_rot = obst_transform_1[:3,:3]
+        obst_rot = numpy.linalg.inv(obst_rot)@rot_90
+        if obst_t[0] > 0.5:
+            # change into meters
+            for i in range(3):
+                obst_t[i] = obst_t[i] / 1000
+        obst_xyz = Rotation.from_matrix(obst_rot).as_euler('xyz', degrees=True)
 
         obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
         obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
         obstacle_mesh.compute_vertex_normals()
         # obstacle_legacy.scale(100.0, [0,0,0])
-        # obstacle_mesh.rotate(obst_rot)
+        obstacle_mesh.rotate(obst_rot)
 
         obstacle_mesh.translate(obst_t)
+        # obstacle_mesh.rotate(obst_xyz)
         _ = scene.add_triangles(obstacle_legacy)
         geom_list.append(obstacle_mesh)
 
@@ -202,25 +205,25 @@ def visualize_workspace(mug_transform, workspace_bound=None, workspace_resolutio
     geom_list.append(pcd)
     geom_list.append(mesh_legacy)
 
-    # add the obstacle if there is one
-    if obstacle==True:
-        print("Adding obstacle to visual)")
-        obst_t = obst_transform[:3,3]
-        obst_rot = obst_transform[:3,:3]
-        if obst_t[0] > 0.5:
-            # change into meters
-            for i in range(3):
-                obst_t[i] = obst_t[i] / 1000
-        obst_xyz = Rotation.from_matrix(obst_rot).as_euler('XYZ', degrees=True)
+    # # add the obstacle if there is one
+    # if obstacle==True:
+    #     print("Adding obstacle to visual)")
+    #     obst_t = obst_transform[:3,3]
+    #     obst_rot = obst_transform[:3,:3]
+    #     if obst_t[0] > 0.5:
+    #         # change into meters
+    #         for i in range(3):
+    #             obst_t[i] = obst_t[i] / 1000
+    #     obst_xyz = Rotation.from_matrix(obst_rot).as_euler('XYZ', degrees=True)
 
-        obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
-        obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
-        obstacle_mesh.compute_vertex_normals()
-        # obstacle_legacy.scale(1000.0, [0,0,0])
-        obstacle_mesh.rotate(obst_rot)
-        obstacle_mesh.translate(obst_t)
-        _ = scene.add_triangles(obstacle_legacy)
-        geom_list.append(obstacle_mesh)
+    #     obstacle_mesh = o3d.io.read_triangle_mesh("Obstacle.stl")
+    #     obstacle_legacy = o3d.t.geometry.TriangleMesh.from_legacy(obstacle_mesh)
+    #     obstacle_mesh.compute_vertex_normals()
+    #     # obstacle_legacy.scale(1000.0, [0,0,0])
+    #     obstacle_mesh.rotate(obst_rot)
+    #     obstacle_mesh.translate(obst_t)
+    #     _ = scene.add_triangles(obstacle_legacy)
+    #     geom_list.append(obstacle_mesh)
 
     o3d.visualization.draw_geometries(geom_list)
 

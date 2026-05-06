@@ -71,7 +71,7 @@ def main():
         arm.set_tcp_offset(TCP_OFFSET)
         arm.set_mode(0)
         arm.set_state(0)
-        arm.move_gohome(wait=True)
+        # arm.move_gohome(wait=True)
 
         grasp_poses = []
 
